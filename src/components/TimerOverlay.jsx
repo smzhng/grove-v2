@@ -5,6 +5,7 @@ import {
   SPEED,
   formatDuration,
   formatRemaining,
+  formatTotalMinutes,
   stageName,
   friendlyName,
 } from '../constants.js'
@@ -56,6 +57,46 @@ function IdlePanel({ startSession }) {
   )
 }
 
+const RING_R = 17
+const RING_C = 2 * Math.PI * RING_R
+
+// Progress ring around the countdown, with tick marks at 1/3 and 2/3 where
+// the growth stage advances (Sprouting -> Growing -> Flourishing).
+function ProgressRing({ progress }) {
+  return (
+    <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">
+      <circle cx="23" cy="23" r={RING_R} fill="none" stroke="rgba(90,105,70,0.18)" strokeWidth="3" />
+      <circle
+        cx="23"
+        cy="23"
+        r={RING_R}
+        fill="none"
+        stroke="#4a6b3f"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={RING_C}
+        strokeDashoffset={RING_C * (1 - progress)}
+        transform="rotate(-90 23 23)"
+        style={{ transition: 'stroke-dashoffset 400ms linear' }}
+      />
+      {[1 / 3, 2 / 3].map((f) => {
+        const a = -Math.PI / 2 + f * Math.PI * 2
+        return (
+          <line
+            key={f}
+            x1={23 + Math.cos(a) * (RING_R - 3)}
+            y1={23 + Math.sin(a) * (RING_R - 3)}
+            x2={23 + Math.cos(a) * (RING_R + 3)}
+            y2={23 + Math.sin(a) * (RING_R + 3)}
+            stroke="#7a8a66"
+            strokeWidth="1.6"
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
 function ActivePanel({ session, plant, cancelSession }) {
   const [now, setNow] = useState(Date.now())
   const [confirming, setConfirming] = useState(false)
@@ -73,15 +114,18 @@ function ActivePanel({ session, plant, cancelSession }) {
     : TIERS[session.tier].label.toLowerCase()
 
   return (
-    <div className={`pointer-events-auto flex flex-col items-center px-8 py-4 ${card}`}>
-      <p className="text-[11.5px] font-medium tracking-[0.14em] text-[#7a8a66] uppercase">
-        {stageName(progress)} · {name}
-      </p>
-      <p className="font-heading my-1 text-4xl text-[#2f3a26] tabular-nums">
-        {formatRemaining(remaining)}
-      </p>
+    <div className={`pointer-events-auto flex items-center gap-3.5 py-3 pr-5 pl-3.5 ${card}`}>
+      <ProgressRing progress={progress} />
+      <div>
+        <p className="font-heading text-2xl leading-none text-[#2f3a26] tabular-nums">
+          {formatRemaining(remaining)}
+        </p>
+        <p className="mt-1 text-xs text-[#7a8a66]">
+          {stageName(progress)} · {name}
+        </p>
+      </div>
       {confirming ? (
-        <div className="flex items-center gap-2">
+        <div className="ml-1.5 flex items-center gap-2">
           <span className="text-xs text-[#8a5a44]">It will wilt.</span>
           <button
             onClick={() => setConfirming(false)}
@@ -99,7 +143,7 @@ function ActivePanel({ session, plant, cancelSession }) {
       ) : (
         <button
           onClick={() => setConfirming(true)}
-          className="cursor-pointer text-sm text-[#5c6b4d] underline-offset-2 hover:text-[#8a5a44] hover:underline"
+          className="ml-1.5 cursor-pointer rounded-lg border border-[#5a6946]/30 px-3 py-1.5 text-xs font-medium text-[#5c6b4d] transition hover:bg-white/60"
         >
           Give up
         </button>
@@ -110,8 +154,9 @@ function ActivePanel({ session, plant, cancelSession }) {
 
 export default function TimerOverlay({ grove }) {
   const { plants, session, toast, startSession, cancelSession } = grove
-  const completed = plants.filter((p) => p.status === 'complete').length
+  const completed = plants.filter((p) => p.status === 'complete')
   const wilted = plants.filter((p) => p.status === 'wilted').length
+  const focusMinutes = completed.reduce((sum, p) => sum + TIERS[p.tier].minutes, 0)
 
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col">
@@ -119,9 +164,13 @@ export default function TimerOverlay({ grove }) {
       <div className="flex items-start justify-between p-5">
         <div>
           <h1 className="font-heading text-[26px] tracking-[0.5px] text-[#38452e]">Grove</h1>
-          <p className="mt-0.5 text-[12.5px] text-[#38452e]/70">
-            {completed} grown{wilted > 0 ? ` · ${wilted} wilted` : ''}
-          </p>
+          {(completed.length > 0 || wilted > 0) && (
+            <p className="mt-0.5 text-[12.5px] text-[#38452e]/70">
+              {completed.length} plant{completed.length === 1 ? '' : 's'} ·{' '}
+              {formatTotalMinutes(focusMinutes)} of focus grown
+              {wilted > 0 ? ` · ${wilted} wilted` : ''}
+            </p>
+          )}
         </div>
         {SPEED !== 1 && (
           <span className="rounded-full bg-amber-200/90 px-2.5 py-1 text-xs font-medium text-amber-900">

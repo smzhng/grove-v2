@@ -52,6 +52,15 @@ export function formatDuration(minutes) {
   return `${h} hr${h > 1 ? 's' : ''}`
 }
 
+// Total accumulated focus time, e.g. "2h 15m" / "3h" / "45m".
+export function formatTotalMinutes(minutes) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h && m) return `${h}h ${m}m`
+  if (h) return `${h}h`
+  return `${m}m`
+}
+
 export function formatRemaining(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000))
   const h = Math.floor(total / 3600)
