@@ -13,6 +13,56 @@ import {
 const card =
   'rounded-[18px] border border-[#5a6946]/20 bg-[#faf9f0]/90 shadow-[0_10px_34px_rgba(50,65,38,0.16)] backdrop-blur-md'
 
+// Small plant silhouettes for the tier buttons, one per tier.
+function TierIcon({ tier, className }) {
+  const props = { viewBox: '0 0 32 32', fill: 'currentColor', className, 'aria-hidden': true }
+  if (tier === 'sprout') {
+    return (
+      <svg {...props}>
+        <path d="M16 28v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+        <path d="M15.5 22c-3.4-.2-5.5-2.3-5.7-5.6 3.4.2 5.5 2.3 5.7 5.6Z" />
+        <path d="M16.5 19.5c3.4-.2 5.5-2.3 5.7-5.6-3.4.2-5.5 2.3-5.7 5.6Z" />
+      </svg>
+    )
+  }
+  if (tier === 'small') {
+    return (
+      <svg {...props} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <path d="M16 28c0-6-.5-9-2.5-13" />
+        <path d="M16 28c0-5 2-9 5.5-12" />
+        <path d="M16 28c-1-4-3.5-7-6.5-8.5" />
+        <path d="M16 28c1.5-3 4.5-5 7-5.5" />
+      </svg>
+    )
+  }
+  if (tier === 'medium') {
+    return (
+      <svg {...props}>
+        <circle cx="10.5" cy="23" r="5" />
+        <circle cx="21.5" cy="23" r="5" />
+        <circle cx="16" cy="18.5" r="6.5" />
+      </svg>
+    )
+  }
+  if (tier === 'large') {
+    return (
+      <svg {...props}>
+        <path d="M16 5l7 10H9l7-10Z" />
+        <path d="M16 11l8.5 12h-17L16 11Z" />
+        <rect x="14.8" y="23" width="2.4" height="5" rx="0.5" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...props}>
+      <rect x="14.8" y="17" width="2.4" height="11" rx="0.5" />
+      <circle cx="16" cy="11.5" r="7" />
+      <circle cx="9.5" cy="15.5" r="4.5" />
+      <circle cx="22.5" cy="15.5" r="4.5" />
+    </svg>
+  )
+}
+
 function IdlePanel({ startSession }) {
   const [picked, setPicked] = useState('sprout')
   const tier = TIERS[picked]
@@ -35,6 +85,10 @@ function IdlePanel({ startSession }) {
                   : 'border-[#5a6946]/20 bg-white/55 hover:bg-white/80'
               }`}
             >
+              <TierIcon
+                tier={key}
+                className={`mb-0.5 h-7 w-7 ${sel ? 'text-[#4a6b3f]' : 'text-[#7a8a66]'}`}
+              />
               <span className="text-[15px] font-bold">{formatDuration(TIERS[key].minutes)}</span>
               <span className="text-[11.5px] font-medium opacity-65">{TIERS[key].label}</span>
             </button>
