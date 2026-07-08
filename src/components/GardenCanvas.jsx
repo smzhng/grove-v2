@@ -13,13 +13,14 @@ function WindTicker() {
   return null
 }
 
-export default function GardenCanvas({ plants, session }) {
+export default function GardenCanvas({ plants, session, onReady }) {
   return (
     <Canvas
       shadows
       camera={{ position: [12, 7.5, 16], fov: 42 }}
       gl={{ antialias: true }}
       className="!absolute inset-0"
+      onCreated={() => onReady?.()}
     >
       {/* warm, calm grade */}
       <color attach="background" args={['#e3e8d0']} />
