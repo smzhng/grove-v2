@@ -43,6 +43,11 @@ everything persists to `localStorage`. Dev server: `npm run dev`
   sky, camera/orbit controls.
 - `src/components/TimerOverlay.jsx` — the Tailwind UI on top of the canvas
   (tier picker, running session card w/ progress ring, toasts).
+- `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen:
+  spinning showcase planet (hand-placed "end-game" garden on a big sphere),
+  wordmark, focus stat, "Enter the garden". Shown on every open *unless* a
+  session is mid-run (silent resume skips it). The menu stays up covering
+  the garden load, then fades once the scene reports ready.
 
 ## History and provenance
 
