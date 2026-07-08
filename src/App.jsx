@@ -27,6 +27,8 @@ export default function App() {
             plants={grove.plants}
             session={grove.session}
             onReady={() => setSceneReady(true)}
+            intro={startWithMenu}
+            introGo={flightDone && sceneReady}
           />
           <TimerOverlay grove={grove} />
         </>
