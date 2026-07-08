@@ -22,6 +22,30 @@ export const SPEED = (() => {
   return Number.isFinite(n) && n > 0 ? n : 1
 })()
 
+// Session progress mapped to a named growth stage, shown in the timer panel.
+export function stageName(progress) {
+  if (progress < 1 / 3) return 'Sprouting'
+  if (progress < 2 / 3) return 'Growing'
+  return 'Flourishing'
+}
+
+// Casual display names per tier, aligned index-for-index with the asset
+// variation order documented in PlantAsset.jsx.
+const FRIENDLY_NAMES = {
+  sprout: ['clover', 'clover', 'tuft of grass', 'wisp of grass', 'mushroom'],
+  small: ['tuft of grass', 'wisp of grass', 'fern', 'wildflower', 'wildflower', 'plant', 'plant'],
+  medium: ['flower patch', 'flower patch', 'plant', 'plant', 'chicken-of-the-woods', 'bush'],
+  large: ['flowering bush', 'pine', 'pine', 'pine', 'pine', 'pine'],
+  hero: [
+    'tree', 'tree', 'tree', 'tree', 'tree',
+    'twisted tree', 'twisted tree', 'twisted tree', 'twisted tree', 'twisted tree',
+  ],
+}
+
+export function friendlyName(tier, variationIndex) {
+  return FRIENDLY_NAMES[tier]?.[variationIndex] ?? TIERS[tier].label.toLowerCase()
+}
+
 export function formatDuration(minutes) {
   if (minutes < 60) return `${minutes} min`
   const h = minutes / 60

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { TIERS, SPEED, growthScale } from '../constants.js'
+import { TIERS, SPEED, growthScale, friendlyName } from '../constants.js'
 import { loadPlants, savePlants, loadSession, saveSession, resetGarden } from '../lib/storage.js'
 import { findSpot } from '../lib/placement.js'
 
@@ -22,7 +22,7 @@ function loadInitial() {
         plants = plants.map((p) =>
           p.id === plant.id ? { ...p, status: 'complete' } : p,
         )
-        toast = `Your ${TIERS[plant.tier].label.toLowerCase()} finished growing while you were away 🌿`
+        toast = `Your ${friendlyName(plant.tier, plant.variationIndex)} finished growing while you were away 🌿`
         session = null
       }
     }
@@ -73,12 +73,16 @@ export default function useGrove() {
   }, [])
 
   const completeSession = useCallback((plantId, tierKey) => {
+    const plant = plants.find((p) => p.id === plantId)
+    const name = plant
+      ? friendlyName(plant.tier, plant.variationIndex)
+      : TIERS[tierKey].label.toLowerCase()
     setPlants((prev) =>
       prev.map((p) => (p.id === plantId ? { ...p, status: 'complete' } : p)),
     )
     setSession(null)
-    showToast(`Your ${TIERS[tierKey].label.toLowerCase()} joined the garden 🌿`)
-  }, [showToast])
+    showToast(`Your ${name} joined the garden 🌿`)
+  }, [plants, showToast])
 
   // Watch for the running session hitting its full duration.
   useEffect(() => {

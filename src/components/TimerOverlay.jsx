@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { TIERS, TIER_ORDER, SPEED, formatDuration, formatRemaining } from '../constants.js'
+import {
+  TIERS,
+  TIER_ORDER,
+  SPEED,
+  formatDuration,
+  formatRemaining,
+  stageName,
+  friendlyName,
+} from '../constants.js'
 
 const card =
   'rounded-[18px] border border-[#5a6946]/20 bg-[#faf9f0]/90 shadow-[0_10px_34px_rgba(50,65,38,0.16)] backdrop-blur-md'
@@ -48,7 +56,7 @@ function IdlePanel({ startSession }) {
   )
 }
 
-function ActivePanel({ session, cancelSession }) {
+function ActivePanel({ session, plant, cancelSession }) {
   const [now, setNow] = useState(Date.now())
   const [confirming, setConfirming] = useState(false)
 
@@ -57,13 +65,17 @@ function ActivePanel({ session, cancelSession }) {
     return () => clearInterval(id)
   }, [])
 
-  const tier = TIERS[session.tier]
-  const remaining = session.durationMs - (now - session.startedAt) * SPEED
+  const elapsed = (now - session.startedAt) * SPEED
+  const remaining = session.durationMs - elapsed
+  const progress = Math.min(Math.max(elapsed / session.durationMs, 0), 1)
+  const name = plant
+    ? friendlyName(plant.tier, plant.variationIndex)
+    : TIERS[session.tier].label.toLowerCase()
 
   return (
     <div className={`pointer-events-auto flex flex-col items-center px-8 py-4 ${card}`}>
       <p className="text-[11.5px] font-medium tracking-[0.14em] text-[#7a8a66] uppercase">
-        Growing: {tier.label}
+        {stageName(progress)} · {name}
       </p>
       <p className="font-heading my-1 text-4xl text-[#2f3a26] tabular-nums">
         {formatRemaining(remaining)}
@@ -130,7 +142,12 @@ export default function TimerOverlay({ grove }) {
       {/* bottom panel */}
       <div className="mt-auto flex justify-center px-4 pb-6">
         {session ? (
-          <ActivePanel key={session.plantId} session={session} cancelSession={cancelSession} />
+          <ActivePanel
+            key={session.plantId}
+            session={session}
+            plant={plants.find((p) => p.id === session.plantId)}
+            cancelSession={cancelSession}
+          />
         ) : (
           <IdlePanel startSession={startSession} />
         )}
