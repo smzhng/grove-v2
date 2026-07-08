@@ -11,6 +11,7 @@ export default function App() {
   // straight to the garden so the timer is immediately visible.
   const startWithMenu = useRef(!grove.session).current
   const [entering, setEntering] = useState(false)
+  const [flightDone, setFlightDone] = useState(false)
   const [menuGone, setMenuGone] = useState(!startWithMenu)
   const [sceneReady, setSceneReady] = useState(false)
 
@@ -35,8 +36,9 @@ export default function App() {
         <StartMenu
           plants={grove.plants}
           entering={entering}
-          fadeOut={entering && sceneReady}
+          fadeOut={flightDone && sceneReady}
           onEnter={() => setEntering(true)}
+          onFlightDone={() => setFlightDone(true)}
           onGone={() => setMenuGone(true)}
         />
       )}

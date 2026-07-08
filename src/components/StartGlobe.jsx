@@ -10,6 +10,10 @@ import PlantAsset from './PlantAsset.jsx'
  * slowly; plants sway with the same wind shader as the real garden. Built
  * from the same PlantAsset placeholders, so it upgrades automatically when
  * real models arrive.
+ *
+ * On "Enter the garden" the camera flies forward and down over the dome like
+ * an airplane on final approach while the planet rolls toward the viewer;
+ * the menu then fades straight into the real garden.
  */
 
 const R = 26
@@ -86,11 +90,15 @@ const MAT = {
   petalDeep: flat('#d2789c'),
 }
 
-function Globe() {
+function Globe({ flying }) {
   const spin = useRef()
 
   useFrame((state, delta) => {
-    if (spin.current) spin.current.rotation.y += delta * 0.06
+    if (spin.current) {
+      spin.current.rotation.y += delta * 0.06
+      // during the landing, the ground rolls toward the viewer
+      if (flying) spin.current.rotation.x += delta * 0.15
+    }
     windTime.value = state.clock.elapsedTime
   })
 
@@ -182,13 +190,44 @@ function Globe() {
   )
 }
 
-export default function StartGlobe() {
+// Airplane-landing camera path: forward over the dome, descending onto it,
+// nose easing down toward the horizon. Fires onDone partway through so the
+// fade to the real garden starts before touchdown; the flight keeps playing
+// underneath the fade.
+const CAM_START = new THREE.Vector3(0, 9, 30)
+const CAM_END = new THREE.Vector3(0, 7.5, 2)
+const LOOK_START = new THREE.Vector3(0, 6, 0)
+const LOOK_END = new THREE.Vector3(0, 4.2, -10)
+const FLY_SECONDS = 2.0
+const FADE_AT = 0.68
+
+function FlightRig({ flying, onDone }) {
+  const t = useRef(0)
+  const fired = useRef(false)
+  const look = useRef(new THREE.Vector3())
+  useFrame((state, delta) => {
+    if (!flying || t.current >= 1) return
+    t.current = Math.min(t.current + delta / FLY_SECONDS, 1)
+    const p = t.current
+    const e = 1 - Math.pow(1 - p, 3) // ease-out: swoop in, settle onto the surface
+    state.camera.position.lerpVectors(CAM_START, CAM_END, e)
+    look.current.lerpVectors(LOOK_START, LOOK_END, e)
+    state.camera.lookAt(look.current)
+    if (p >= FADE_AT && !fired.current) {
+      fired.current = true
+      onDone?.()
+    }
+  })
+  return null
+}
+
+export default function StartGlobe({ flying, onFlightDone }) {
   return (
     <Canvas
       shadows
       gl={{ alpha: true, antialias: true }}
-      camera={{ position: [0, 8, 30], fov: 35 }}
-      onCreated={({ camera }) => camera.lookAt(0, 2.5, 0)}
+      camera={{ position: [0, 9, 30], fov: 35 }}
+      onCreated={({ camera }) => camera.lookAt(0, 6, 0)}
     >
       <ambientLight intensity={0.6} color="#fff3e0" />
       <hemisphereLight args={['#cbe2f7', '#a89369', 0.5]} />
@@ -206,7 +245,8 @@ export default function StartGlobe() {
         shadow-camera-far={60}
         shadow-bias={-0.0004}
       />
-      <Globe />
+      <Globe flying={flying} />
+      <FlightRig flying={flying} onDone={onFlightDone} />
     </Canvas>
   )
 }
