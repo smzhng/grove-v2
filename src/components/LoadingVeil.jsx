@@ -17,7 +17,7 @@ export default function LoadingVeil({ ready }) {
   return (
     <div
       onTransitionEnd={() => setGone(true)}
-      className={`absolute inset-0 z-10 grid place-items-center bg-[#e3e8d0] transition-opacity duration-700 ${
+      className={`absolute inset-0 z-10 grid place-items-center bg-[linear-gradient(180deg,#7fb2d9_0%,#abd0e9_55%,#e3f0f7_100%)] transition-opacity duration-700 ${
         fading ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
     >

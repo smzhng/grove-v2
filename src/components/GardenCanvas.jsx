@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { windTime } from '../lib/sway.js'
@@ -13,6 +15,27 @@ function WindTicker() {
   return null
 }
 
+// Gradient sky: deeper blue overhead fading to a pale horizon, rendered to a
+// small canvas strip and used as the scene background.
+function Sky() {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')
+    const grad = ctx.createLinearGradient(0, 0, 0, 512)
+    grad.addColorStop(0, '#7fb2d9')
+    grad.addColorStop(0.55, '#abd0e9')
+    grad.addColorStop(1, '#e3f0f7')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 2, 512)
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+  }, [])
+  return <primitive attach="background" object={texture} />
+}
+
 export default function GardenCanvas({ plants, session, onReady }) {
   return (
     <Canvas
@@ -22,11 +45,11 @@ export default function GardenCanvas({ plants, session, onReady }) {
       className="!absolute inset-0"
       onCreated={() => onReady?.()}
     >
-      {/* warm, calm grade */}
-      <color attach="background" args={['#e3e8d0']} />
-      <fog attach="fog" args={['#e3e8d0', 42, 95]} />
+      {/* warm, calm grade under a blue gradient sky */}
+      <Sky />
+      <fog attach="fog" args={['#ddecf6', 42, 95]} />
       <ambientLight intensity={0.55} color="#fff3e0" />
-      <hemisphereLight args={['#d8e8ff', '#7a9455', 0.45]} />
+      <hemisphereLight args={['#cbe2f7', '#a89369', 0.6]} />
       <directionalLight
         castShadow
         position={[14, 20, 9]}
