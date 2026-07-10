@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { TIERS, SPEED, growthScale, friendlyName } from '../constants.js'
+import { TIERS, SPEED, growthScale, friendlyName, stageName } from '../constants.js'
 import { loadPlants, savePlants, loadSession, saveSession, resetGarden } from '../lib/storage.js'
-import { findSpot } from '../lib/placement.js'
+import { isSpotValid } from '../lib/placement.js'
 
 // Reconcile stored state on startup:
 // - active session still within its duration -> resume it
@@ -84,43 +84,88 @@ export default function useGrove() {
     showToast(`Your ${name} joined the garden 🌿`)
   }, [plants, showToast])
 
-  // Watch for the running session hitting its full duration.
+  // Watch for the running session hitting its full duration, and announce
+  // each growth-stage transition (Sprouting -> Growing -> Flourishing) once.
   useEffect(() => {
     if (!session) return
+    let lastStage = null
     const check = () => {
       const elapsed = (Date.now() - session.startedAt) * SPEED
-      if (elapsed >= session.durationMs) completeSession(session.plantId, session.tier)
+      if (elapsed >= session.durationMs) {
+        completeSession(session.plantId, session.tier)
+        return
+      }
+      const progress = elapsed / session.durationMs
+      const stage = stageName(progress)
+      if (lastStage === null) {
+        lastStage = stage
+      } else if (stage !== lastStage) {
+        lastStage = stage
+        const plant = plants.find((p) => p.id === session.plantId)
+        const name = plant
+          ? friendlyName(plant.tier, plant.variationIndex)
+          : TIERS[session.tier].label.toLowerCase()
+        showToast(`Your ${name} is ${stage.toLowerCase()} 🌿`)
+      }
     }
     check()
     const id = setInterval(check, 500)
     return () => clearInterval(id)
-  }, [session, completeSession])
+  }, [session, completeSession, plants, showToast])
 
-  const startSession = useCallback(
+  // Manual placement flow: pick a tier -> ghost preview follows the mouse
+  // (`placing`) -> click a valid spot -> dig/seed animation plays
+  // (`planting`) -> seed buried -> plant + session actually begin. Neither
+  // transient phase is persisted; a reload mid-flow just cancels it.
+  const [placing, setPlacing] = useState(null)
+  const [planting, setPlanting] = useState(null)
+
+  const beginPlacement = useCallback(
     (tierKey) => {
-      if (session) return
-      const tier = TIERS[tierKey]
-      const { x, z } = findSpot(tierKey, plants)
-      const plant = {
-        id: crypto.randomUUID(),
+      if (session || placing || planting) return
+      setPlacing({
         tier: tierKey,
-        variationIndex: Math.floor(Math.random() * tier.variations),
-        x,
-        z,
+        variationIndex: Math.floor(Math.random() * TIERS[tierKey].variations),
         rotation: Math.random() * Math.PI * 2,
         scale: 0.85 + Math.random() * 0.3,
-        status: 'growing',
-      }
-      setPlants((prev) => [...prev, plant])
-      setSession({
-        plantId: plant.id,
-        tier: tierKey,
-        startedAt: Date.now(),
-        durationMs: tier.minutes * 60 * 1000,
       })
     },
-    [session, plants],
+    [session, placing, planting],
   )
+
+  const cancelPlacement = useCallback(() => setPlacing(null), [])
+
+  const confirmPlacement = useCallback(
+    (x, z) => {
+      if (!placing || !isSpotValid(x, z, placing.tier, plants)) return
+      setPlanting({ ...placing, x, z })
+      setPlacing(null)
+    },
+    [placing, plants],
+  )
+
+  // Called when the dig/seed animation finishes: the session starts now.
+  const finishPlanting = useCallback(() => {
+    if (!planting) return
+    const plant = {
+      id: crypto.randomUUID(),
+      tier: planting.tier,
+      variationIndex: planting.variationIndex,
+      x: planting.x,
+      z: planting.z,
+      rotation: planting.rotation,
+      scale: planting.scale,
+      status: 'growing',
+    }
+    setPlants((prev) => [...prev, plant])
+    setSession({
+      plantId: plant.id,
+      tier: planting.tier,
+      startedAt: Date.now(),
+      durationMs: TIERS[planting.tier].minutes * 60 * 1000,
+    })
+    setPlanting(null)
+  }, [planting])
 
   // Cancel = the plant wilts at roughly the size it had reached.
   const cancelSession = useCallback(() => {
@@ -138,5 +183,16 @@ export default function useGrove() {
     showToast('The plant wilted. Its remains stay in the garden.')
   }, [session, showToast])
 
-  return { plants, session, toast, startSession, cancelSession }
+  return {
+    plants,
+    session,
+    toast,
+    placing,
+    planting,
+    beginPlacement,
+    cancelPlacement,
+    confirmPlacement,
+    finishPlanting,
+    cancelSession,
+  }
 }

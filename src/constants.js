@@ -61,6 +61,13 @@ export function formatTotalMinutes(minutes) {
   return `${m}m`
 }
 
+// Time invested so far in a running session, for the wilt-confirm copy.
+export function formatInvested(ms) {
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 1) return 'a few minutes'
+  return formatTotalMinutes(minutes)
+}
+
 export function formatRemaining(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000))
   const h = Math.floor(total / 3600)

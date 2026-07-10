@@ -335,7 +335,9 @@ function buildWilted(tier, vi, add) {
   }
 }
 
-export default function PlantAsset({ tier, variationIndex, isWilted }) {
+// overrideMaterial replaces every part's material — used for the translucent
+// ghost preview during placement.
+export default function PlantAsset({ tier, variationIndex, isWilted, overrideMaterial }) {
   const parts = useMemo(() => {
     const list = []
     const add = (geo, mat, pos, scl, rot = [0, 0, 0]) => list.push({ geo, mat, pos, scl, rot })
@@ -353,9 +355,9 @@ export default function PlantAsset({ tier, variationIndex, isWilted }) {
       {parts.map((p, i) => (
         <mesh
           key={i}
-          castShadow
+          castShadow={!overrideMaterial}
           geometry={p.geo}
-          material={p.mat}
+          material={overrideMaterial || p.mat}
           position={p.pos}
           scale={p.scl}
           rotation={p.rot}

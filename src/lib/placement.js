@@ -45,6 +45,23 @@ export function distToPath(x, z) {
 // don't spawn inside them. [x, z, radius]
 export const OBSTACLES = []
 
+// Can a plant of this tier be placed at (x, z) right now? Same rules the
+// scatter algorithm uses: inside the garden circle, off the path, clear of
+// scenery rocks and other plants. Drives the ghost preview's valid/invalid
+// tint during manual placement.
+export function isSpotValid(x, z, tierKey, plants) {
+  const clearance = TIERS[tierKey].clearance
+  if (Math.hypot(x, z) > GARDEN_RADIUS - clearance * 0.5) return false
+  if (distToPath(x, z) < PATH_HALF_WIDTH + clearance * 0.6) return false
+  const hitsObstacle = OBSTACLES.some(
+    ([ox, oz, or_]) => Math.hypot(x - ox, z - oz) < or_ + clearance * 0.7,
+  )
+  if (hitsObstacle) return false
+  return !plants.some(
+    (p) => Math.hypot(x - p.x, z - p.z) < clearance + TIERS[p.tier].clearance,
+  )
+}
+
 // Rejection-sampled scatter with per-tier clearance. If the garden gets
 // crowded, the clearance relaxes gradually so planting never fails outright.
 export function findSpot(tierKey, plants, rand = Math.random) {

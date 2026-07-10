@@ -6,6 +6,7 @@ import {
   formatDuration,
   formatRemaining,
   formatTotalMinutes,
+  formatInvested,
   stageName,
   friendlyName,
 } from '../constants.js'
@@ -63,45 +64,55 @@ function TierIcon({ tier, className }) {
   )
 }
 
-function IdlePanel({ startSession }) {
+function IdlePanel({ beginPlacement, plants }) {
   const [picked, setPicked] = useState('sprout')
   const tier = TIERS[picked]
+  const grownCounts = TIER_ORDER.reduce((acc, key) => {
+    acc[key] = plants.filter((p) => p.tier === key && p.status === 'complete').length
+    return acc
+  }, {})
 
   return (
-    <div className={`pointer-events-auto w-full max-w-[560px] px-5 pt-[18px] pb-4 ${card}`}>
-      <p className="mb-2.5 text-[11.5px] font-medium tracking-[0.14em] text-[#7a8a66] uppercase">
+    <div className={`pointer-events-auto w-full max-w-[620px] px-6 pt-5 pb-[18px] ${card}`}>
+      <p className="mb-3 text-[11.5px] font-medium tracking-[0.14em] text-[#7a8a66] uppercase">
         Plant a session
       </p>
-      <div className="mb-3.5 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2.5">
         {TIER_ORDER.map((key) => {
           const sel = picked === key
+          const count = grownCounts[key]
           return (
             <button
               key={key}
               onClick={() => setPicked(key)}
-              className={`flex flex-1 basis-[88px] cursor-pointer flex-col items-center gap-0.5 rounded-xl border-[1.5px] px-1.5 py-2.5 text-[#38452e] transition ${
+              className={`relative flex flex-1 basis-[96px] cursor-pointer flex-col items-center gap-1 rounded-2xl border-[1.5px] px-2 py-3.5 text-[#38452e] transition ${
                 sel
-                  ? 'border-[#4a6b3f] bg-[#e4ecd6]'
-                  : 'border-[#5a6946]/20 bg-white/55 hover:bg-white/80'
+                  ? 'border-[#4a6b3f] bg-[#e4ecd6] shadow-[0_2px_8px_rgba(58,84,48,0.15)]'
+                  : 'border-[#5a6946]/20 bg-white/55 hover:-translate-y-0.5 hover:bg-white/85'
               }`}
             >
+              {count > 0 && (
+                <span className="absolute top-1.5 right-1.5 rounded-full bg-[#4a6b3f]/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#f7f5ea]">
+                  ×{count}
+                </span>
+              )}
               <TierIcon
                 tier={key}
-                className={`mb-0.5 h-7 w-7 ${sel ? 'text-[#4a6b3f]' : 'text-[#7a8a66]'}`}
+                className={`mb-0.5 h-8 w-8 ${sel ? 'text-[#4a6b3f]' : 'text-[#7a8a66]'}`}
               />
-              <span className="text-[15px] font-bold">{formatDuration(TIERS[key].minutes)}</span>
+              <span className="text-[16px] font-bold">{formatDuration(TIERS[key].minutes)}</span>
               <span className="text-[11.5px] font-medium opacity-65">{TIERS[key].label}</span>
             </button>
           )
         })}
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-4">
         <p className="text-[12.5px] leading-snug text-[#6c7a5a]">
           Stay the full {formatDuration(tier.minutes)} and a {tier.label.toLowerCase()} takes
           root. Leave early and it wilts.
         </p>
         <button
-          onClick={() => startSession(picked)}
+          onClick={() => beginPlacement(picked)}
           className="cursor-pointer rounded-xl bg-[#4a6b3f] px-[26px] py-3 text-[15px] font-semibold whitespace-nowrap text-[#f7f5ea] shadow-[0_3px_10px_rgba(58,84,48,0.35)] transition hover:-translate-y-0.5 hover:bg-[#557a49] active:translate-y-0"
         >
           Plant
@@ -167,6 +178,14 @@ function ActivePanel({ session, plant, cancelSession }) {
     ? friendlyName(plant.tier, plant.variationIndex)
     : TIERS[session.tier].label.toLowerCase()
 
+  // Countdown in the tab title, so it's visible while working in other tabs.
+  useEffect(() => {
+    document.title = `${formatRemaining(remaining)} · Grove`
+    return () => {
+      document.title = 'Grove'
+    }
+  }, [remaining])
+
   return (
     <div className={`pointer-events-auto flex items-center gap-3.5 py-3 pr-5 pl-3.5 ${card}`}>
       <ProgressRing progress={progress} />
@@ -180,7 +199,9 @@ function ActivePanel({ session, plant, cancelSession }) {
       </div>
       {confirming ? (
         <div className="ml-1.5 flex items-center gap-2">
-          <span className="text-xs text-[#8a5a44]">It will wilt.</span>
+          <span className="text-xs text-[#8a5a44]">
+            {formatInvested(elapsed)} of growth will wilt.
+          </span>
           <button
             onClick={() => setConfirming(false)}
             className="cursor-pointer rounded-lg border border-[#5a6946]/30 px-3 py-1.5 text-xs font-medium text-[#5c6b4d] transition hover:bg-white/60"
@@ -206,8 +227,70 @@ function ActivePanel({ session, plant, cancelSession }) {
   )
 }
 
-export default function TimerOverlay({ grove }) {
-  const { plants, session, toast, startSession, cancelSession } = grove
+// Instruction card while the ghost preview is active.
+function PlacementPanel({ placing, cancelPlacement }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') cancelPlacement()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [cancelPlacement])
+
+  return (
+    <div className={`pointer-events-auto flex items-center gap-4 px-6 py-3.5 ${card}`}>
+      <div>
+        <p className="text-[13.5px] font-medium text-[#38452e]">
+          Choose a spot for your {friendlyName(placing.tier, placing.variationIndex)}
+        </p>
+        <p className="mt-0.5 text-xs text-[#7a8a66]">
+          Click the ground to plant it · drag to look around
+        </p>
+      </div>
+      <button
+        onClick={cancelPlacement}
+        className="cursor-pointer rounded-lg border border-[#5a6946]/30 px-3 py-1.5 text-xs font-medium text-[#5c6b4d] transition hover:bg-white/60"
+      >
+        Cancel
+      </button>
+    </div>
+  )
+}
+
+// Small floating control, bottom-right, that eases the camera back to the
+// default resting view.
+function RecenterButton({ onRecenter }) {
+  return (
+    <button
+      onClick={onRecenter}
+      title="Recenter view"
+      aria-label="Recenter view"
+      className={`pointer-events-auto grid h-10 w-10 cursor-pointer place-items-center text-[#5c6b4d] transition hover:text-[#38452e] ${card}`}
+    >
+      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden="true">
+        <circle cx="12" cy="12" r="2.4" fill="currentColor" />
+        <g stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+          <path d="M12 2.5v4" />
+          <path d="M12 17.5v4" />
+          <path d="M2.5 12h4" />
+          <path d="M17.5 12h4" />
+        </g>
+      </svg>
+    </button>
+  )
+}
+
+export default function TimerOverlay({ grove, onRecenter }) {
+  const {
+    plants,
+    session,
+    toast,
+    placing,
+    planting,
+    beginPlacement,
+    cancelPlacement,
+    cancelSession,
+  } = grove
   const completed = plants.filter((p) => p.status === 'complete')
   const wilted = plants.filter((p) => p.status === 'wilted').length
   const focusMinutes = completed.reduce((sum, p) => sum + TIERS[p.tier].minutes, 0)
@@ -251,9 +334,20 @@ export default function TimerOverlay({ grove }) {
             plant={plants.find((p) => p.id === session.plantId)}
             cancelSession={cancelSession}
           />
+        ) : placing ? (
+          <PlacementPanel placing={placing} cancelPlacement={cancelPlacement} />
+        ) : planting ? (
+          <div className={`pointer-events-auto px-6 py-3.5 text-[13.5px] text-[#5c6b4d] ${card}`}>
+            Planting your {friendlyName(planting.tier, planting.variationIndex)}…
+          </div>
         ) : (
-          <IdlePanel startSession={startSession} />
+          <IdlePanel beginPlacement={beginPlacement} plants={plants} />
         )}
+      </div>
+
+      {/* recenter view control */}
+      <div className="absolute right-5 bottom-6">
+        <RecenterButton onRecenter={onRecenter} />
       </div>
     </div>
   )

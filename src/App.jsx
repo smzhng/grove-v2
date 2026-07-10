@@ -14,13 +14,14 @@ export default function App() {
   const [flightDone, setFlightDone] = useState(false)
   const [menuGone, setMenuGone] = useState(!startWithMenu)
   const [sceneReady, setSceneReady] = useState(false)
+  const [recenterSignal, setRecenterSignal] = useState(0)
 
   // Via the menu, the garden only mounts once "Enter" is clicked; the menu
   // stays up (covering the load) until the scene reports ready, then fades.
   const gardenMounted = !startWithMenu || entering
 
   return (
-    <div className="relative h-full w-full">
+    <div className={`relative h-full w-full ${grove.placing ? 'cursor-shovel' : ''}`}>
       {gardenMounted && (
         <>
           <GardenCanvas
@@ -29,8 +30,13 @@ export default function App() {
             onReady={() => setSceneReady(true)}
             intro={startWithMenu}
             introGo={flightDone && sceneReady}
+            placing={grove.placing}
+            planting={grove.planting}
+            onConfirmPlacement={grove.confirmPlacement}
+            onPlantingDone={grove.finishPlanting}
+            recenterSignal={recenterSignal}
           />
-          <TimerOverlay grove={grove} />
+          <TimerOverlay grove={grove} onRecenter={() => setRecenterSignal((n) => n + 1)} />
         </>
       )}
       {!startWithMenu && <LoadingVeil ready={sceneReady} />}

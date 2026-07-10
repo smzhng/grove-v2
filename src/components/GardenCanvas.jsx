@@ -3,9 +3,12 @@ import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { windTime } from '../lib/sway.js'
+import { isSpotValid, GARDEN_RADIUS } from '../lib/placement.js'
+import { TIERS } from '../constants.js'
 import Ground from './Ground.jsx'
 import Scenery from './Scenery.jsx'
 import Plant from './Plant.jsx'
+import PlantAsset from './PlantAsset.jsx'
 
 // Drives the shared wind uniform for every sway material, once per frame.
 function WindTicker() {
@@ -34,6 +37,178 @@ function Sky() {
     return tex
   }, [])
   return <primitive attach="background" object={texture} />
+}
+
+const ghostValidMat = new THREE.MeshStandardMaterial({
+  color: '#7fb668',
+  transparent: true,
+  opacity: 0.5,
+  depthWrite: false,
+})
+const ghostInvalidMat = new THREE.MeshStandardMaterial({
+  color: '#c65540',
+  transparent: true,
+  opacity: 0.4,
+  depthWrite: false,
+})
+const dirtMat = new THREE.MeshStandardMaterial({
+  color: '#7a5b40',
+  roughness: 1,
+  metalness: 0,
+  flatShading: true,
+})
+const holeMat = new THREE.MeshStandardMaterial({ color: '#3e2f23', roughness: 1, metalness: 0 })
+const seedMat = new THREE.MeshStandardMaterial({
+  color: '#8a6a3f',
+  roughness: 0.9,
+  metalness: 0,
+  flatShading: true,
+})
+const sphereGeo = new THREE.SphereGeometry(1, 8, 6)
+const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 16)
+
+// Translucent preview that follows the mouse during placement. Green when
+// the spot is plantable, red when it isn't; click confirms.
+function GhostPlanter({ placing, plants, onConfirm }) {
+  const ghost = useRef()
+  const ring = useRef()
+  const spot = useRef(null)
+  const [valid, setValid] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const clearance = TIERS[placing.tier].clearance
+
+  const handleMove = (e) => {
+    const { x, z } = e.point
+    const v = isSpotValid(x, z, placing.tier, plants)
+    spot.current = { x, z, v }
+    if (ghost.current) ghost.current.position.set(x, 0, z)
+    if (ring.current) ring.current.position.set(x, 0.03, z)
+    if (v !== valid) setValid(v)
+    if (!hovering) setHovering(true)
+  }
+
+  return (
+    <>
+      {/* invisible raycast target covering the whole garden area */}
+      <mesh
+        rotation-x={-Math.PI / 2}
+        position={[0, 0.005, 0]}
+        onPointerMove={handleMove}
+        onPointerOut={() => setHovering(false)}
+        onClick={() => {
+          if (spot.current?.v) onConfirm(spot.current.x, spot.current.z)
+        }}
+      >
+        <circleGeometry args={[GARDEN_RADIUS + 5, 48]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <group ref={ghost} visible={hovering} rotation={[0, placing.rotation, 0]} scale={placing.scale}>
+        <PlantAsset
+          tier={placing.tier}
+          variationIndex={placing.variationIndex}
+          isWilted={false}
+          overrideMaterial={valid ? ghostValidMat : ghostInvalidMat}
+        />
+      </group>
+      <mesh ref={ring} visible={hovering} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[clearance * 0.85, clearance, 32]} />
+        <meshBasicMaterial
+          color={valid ? '#4a6b3f' : '#a03d2e'}
+          transparent
+          opacity={0.55}
+          depthWrite={false}
+        />
+      </mesh>
+    </>
+  )
+}
+
+// The planting ritual at the chosen spot: a hole opens and dirt clods pop
+// out, a seed drops from the sky into it, then the dirt covers back over
+// into a little mound. Fires onDone once the mound has settled — that's
+// when the session actually starts.
+function PlantingFX({ planting, onDone }) {
+  const t = useRef(0)
+  const done = useRef(false)
+  const hole = useRef()
+  const seed = useRef()
+  const mound = useRef()
+  const clods = useRef([])
+  const f = 0.7 + TIERS[planting.tier].clearance * 0.55
+  const moundR = 0.22 * f
+  const clodDirs = useMemo(
+    () => [0.4, 2.5, 4.6].map((a) => [Math.cos(a), Math.sin(a)]),
+    [],
+  )
+
+  useFrame((_, delta) => {
+    if (done.current) return
+    t.current += delta
+    const T = t.current
+
+    // hole: open (0-0.3s), hold, close (0.95-1.45s)
+    const holeS =
+      T < 0.3 ? T / 0.3 : T < 0.95 ? 1 : Math.max(0, 1 - (T - 0.95) / 0.5)
+    if (hole.current) {
+      hole.current.scale.set(0.3 * f * holeS, 0.03, 0.3 * f * holeS)
+      hole.current.visible = holeS > 0.01
+    }
+
+    // dirt clods: arc out with the dig, sink away as the hole closes
+    clods.current.forEach((c, i) => {
+      if (!c) return
+      const [dx, dz] = clodDirs[i]
+      const u = Math.min(T / 0.3, 1)
+      const rest = 0.45 * f
+      c.position.set(dx * u * rest, Math.sin(u * Math.PI) * 0.3 * f + 0.03, dz * u * rest)
+      const shrink = T < 0.95 ? 1 : Math.max(0, 1 - (T - 0.95) / 0.5)
+      c.scale.setScalar(0.07 * f * shrink)
+      c.visible = shrink > 0.01
+    })
+
+    // seed: falls from the sky (0.3-0.95s), buried once the dirt covers it
+    if (seed.current) {
+      const u = Math.min(Math.max((T - 0.3) / 0.65, 0), 1)
+      seed.current.position.y = 0.05 + (7 - 0.05) * (1 - u * u)
+      seed.current.visible = T >= 0.3 && T < 1.2
+    }
+
+    // mound: rises as the hole closes
+    const mS = T < 0.95 ? 0 : Math.min((T - 0.95) / 0.5, 1)
+    if (mound.current) {
+      mound.current.scale.set(moundR * mS, moundR * 0.45 * mS, moundR * mS)
+      mound.current.visible = mS > 0.01
+    }
+
+    if (T >= 1.75) {
+      done.current = true
+      onDone?.()
+    }
+  })
+
+  return (
+    <group position={[planting.x, 0, planting.z]}>
+      <mesh ref={hole} geometry={cylGeo} material={holeMat} position={[0, 0.015, 0]} />
+      {clodDirs.map((_, i) => (
+        <mesh
+          key={i}
+          ref={(el) => (clods.current[i] = el)}
+          geometry={sphereGeo}
+          material={dirtMat}
+          castShadow
+        />
+      ))}
+      <mesh
+        ref={seed}
+        geometry={sphereGeo}
+        material={seedMat}
+        scale={[0.06 * f, 0.09 * f, 0.06 * f]}
+        visible={false}
+        castShadow
+      />
+      <mesh ref={mound} geometry={sphereGeo} material={dirtMat} visible={false} castShadow />
+    </group>
+  )
 }
 
 // Default resting view, expressed as an orbit around the garden center so
@@ -76,8 +251,58 @@ function IntroRig({ go, onDone }) {
   return null
 }
 
-export default function GardenCanvas({ plants, session, onReady, intro = false, introGo = false }) {
+const REST_POSITION = new THREE.Vector3(12, 7.5, 16)
+
+// Eases the camera back to the default resting view when `signal` changes
+// (a simple incrementing counter from the parent). Takes over from
+// OrbitControls for the duration, then hands control back.
+function RecenterRig({ signal, controlsRef, setEnabled }) {
+  const t = useRef(0)
+  const active = useRef(false)
+  const prevSignal = useRef(signal)
+  const start = useRef(new THREE.Vector3())
+  const startTarget = useRef(new THREE.Vector3())
+  const target = useRef(new THREE.Vector3())
+
+  useFrame((state, delta) => {
+    if (signal !== prevSignal.current && !active.current) {
+      prevSignal.current = signal
+      active.current = true
+      t.current = 0
+      start.current.copy(state.camera.position)
+      if (controlsRef.current) startTarget.current.copy(controlsRef.current.target)
+      setEnabled(false)
+    }
+    if (!active.current) return
+    t.current = Math.min(t.current + delta / 1.1, 1)
+    const e = 1 - Math.pow(1 - t.current, 3)
+    state.camera.position.lerpVectors(start.current, REST_POSITION, e)
+    target.current.lerpVectors(startTarget.current, ORBIT_TARGET, e)
+    state.camera.lookAt(target.current)
+    if (controlsRef.current) controlsRef.current.target.copy(target.current)
+    if (t.current >= 1) {
+      active.current = false
+      setEnabled(true)
+    }
+  })
+  return null
+}
+
+export default function GardenCanvas({
+  plants,
+  session,
+  onReady,
+  intro = false,
+  introGo = false,
+  placing = null,
+  planting = null,
+  onConfirmPlacement,
+  onPlantingDone,
+  recenterSignal = 0,
+}) {
   const [introDone, setIntroDone] = useState(!intro)
+  const [controlsEnabled, setControlsEnabled] = useState(!intro)
+  const controlsRef = useRef()
   return (
     <Canvas
       shadows
@@ -114,11 +339,29 @@ export default function GardenCanvas({ plants, session, onReady, intro = false, 
       {plants.map((p) => (
         <Plant key={p.id} plant={p} session={session} />
       ))}
+      {placing && (
+        <GhostPlanter placing={placing} plants={plants} onConfirm={onConfirmPlacement} />
+      )}
+      {planting && (
+        <PlantingFX key={`${planting.x},${planting.z}`} planting={planting} onDone={onPlantingDone} />
+      )}
 
       <WindTicker />
-      {intro && !introDone && <IntroRig go={introGo} onDone={() => setIntroDone(true)} />}
+      {intro && !introDone && (
+        <IntroRig
+          go={introGo}
+          onDone={() => {
+            setIntroDone(true)
+            setControlsEnabled(true)
+          }}
+        />
+      )}
+      {introDone && (
+        <RecenterRig signal={recenterSignal} controlsRef={controlsRef} setEnabled={setControlsEnabled} />
+      )}
       <OrbitControls
-        enabled={introDone}
+        ref={controlsRef}
+        enabled={controlsEnabled}
         enableDamping
         dampingFactor={0.08}
         enablePan={false}
