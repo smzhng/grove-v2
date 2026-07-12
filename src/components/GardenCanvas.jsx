@@ -295,6 +295,34 @@ function FlyToRig({ signal, camPos, lookAt, controlsRef, setEnabled }) {
   return null
 }
 
+// Google-Earth-style pan bounds: keeps the orbit pivot within a radius of
+// world center (so "fly" never wanders past the mountain ring) and pinned
+// to a fixed height (screen-space panning would otherwise drag it up into
+// the sky). Runs after OrbitControls' own update each frame.
+const MAX_TARGET_RADIUS = 48
+function PanBoundsRig({ controlsRef, active }) {
+  useFrame(() => {
+    if (!active) return
+    const controls = controlsRef.current
+    if (!controls) return
+    const t = controls.target
+    let changed = false
+    const r = Math.hypot(t.x, t.z)
+    if (r > MAX_TARGET_RADIUS) {
+      const s = MAX_TARGET_RADIUS / r
+      t.x *= s
+      t.z *= s
+      changed = true
+    }
+    if (Math.abs(t.y - ORBIT_TARGET.y) > 0.01) {
+      t.y = ORBIT_TARGET.y
+      changed = true
+    }
+    if (changed) controls.update()
+  })
+  return null
+}
+
 export default function GardenCanvas({
   plants,
   session,
@@ -397,16 +425,19 @@ export default function GardenCanvas({
           />
         </>
       )}
+      <PanBoundsRig controlsRef={controlsRef} active={controlsEnabled} />
       <OrbitControls
         ref={controlsRef}
         enabled={controlsEnabled}
         enableDamping
         dampingFactor={0.08}
-        enablePan={false}
+        enablePan
+        panSpeed={0.7}
+        screenSpacePanning={false}
         minDistance={5}
         maxDistance={focusHouse ? 10 : 22}
         maxPolarAngle={Math.PI * 0.46}
-        target={[0, 0.8, 0]}
+        target={ORBIT_TARGET}
       />
     </Canvas>
   )
