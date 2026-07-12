@@ -10,6 +10,7 @@ import {
   stageName,
   friendlyName,
 } from '../constants.js'
+import Library from './Library.jsx'
 
 const card =
   'rounded-[18px] border border-[#5a6946]/20 bg-[#faf9f0]/90 shadow-[0_10px_34px_rgba(50,65,38,0.16)] backdrop-blur-md'
@@ -280,7 +281,25 @@ function RecenterButton({ onRecenter }) {
   )
 }
 
+// Small floating control, bottom-right, that opens the discovery library.
+function LibraryButton({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Garden library"
+      aria-label="Garden library"
+      className={`pointer-events-auto grid h-10 w-10 cursor-pointer place-items-center text-[#5c6b4d] transition hover:text-[#38452e] ${card}`}
+    >
+      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden="true">
+        <rect x="4" y="3.5" width="16" height="17" rx="1.6" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    </button>
+  )
+}
+
 export default function TimerOverlay({ grove, onRecenter }) {
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const {
     plants,
     session,
@@ -345,10 +364,13 @@ export default function TimerOverlay({ grove, onRecenter }) {
         )}
       </div>
 
-      {/* recenter view control */}
-      <div className="absolute right-5 bottom-6">
+      {/* recenter view + library controls */}
+      <div className="absolute right-5 bottom-6 flex flex-col items-end gap-2">
+        <LibraryButton onClick={() => setLibraryOpen(true)} />
         <RecenterButton onRecenter={onRecenter} />
       </div>
+
+      <Library open={libraryOpen} onClose={() => setLibraryOpen(false)} plants={plants} />
     </div>
   )
 }
