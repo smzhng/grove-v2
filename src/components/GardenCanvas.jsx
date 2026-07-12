@@ -323,6 +323,48 @@ function PanBoundsRig({ controlsRef, active }) {
   return null
 }
 
+// After a stretch of no input, slowly auto-orbits the camera around the
+// current pivot (Y-axis only, radius/height preserved) so an idle garden
+// still feels alive. Any pointer/wheel activity resets the idle clock and
+// hands control straight back to OrbitControls.
+const IDLE_DELAY = 30 // seconds of no input before drift starts
+const IDLE_SPEED = 0.025 // radians/sec
+function IdleDriftRig({ controlsRef, active }) {
+  const idleFor = useRef(0)
+  useEffect(() => {
+    if (!active) return
+    const reset = () => {
+      idleFor.current = 0
+    }
+    window.addEventListener('pointerdown', reset)
+    window.addEventListener('pointermove', reset)
+    window.addEventListener('wheel', reset)
+    return () => {
+      window.removeEventListener('pointerdown', reset)
+      window.removeEventListener('pointermove', reset)
+      window.removeEventListener('wheel', reset)
+    }
+  }, [active])
+  useFrame((state, delta) => {
+    if (!active) return
+    idleFor.current += delta
+    if (idleFor.current < IDLE_DELAY) return
+    const controls = controlsRef.current
+    if (!controls) return
+    const cam = state.camera
+    const t = controls.target
+    const dx = cam.position.x - t.x
+    const dz = cam.position.z - t.z
+    const angle = IDLE_SPEED * delta
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    cam.position.x = t.x + dx * cos - dz * sin
+    cam.position.z = t.z + dx * sin + dz * cos
+    controls.update()
+  })
+  return null
+}
+
 export default function GardenCanvas({
   plants,
   session,
@@ -426,6 +468,7 @@ export default function GardenCanvas({
         </>
       )}
       <PanBoundsRig controlsRef={controlsRef} active={controlsEnabled} />
+      <IdleDriftRig controlsRef={controlsRef} active={controlsEnabled} />
       <OrbitControls
         ref={controlsRef}
         enabled={controlsEnabled}
