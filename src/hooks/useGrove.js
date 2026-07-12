@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TIERS, SPEED, growthScale, friendlyName, stageName } from '../constants.js'
-import { loadPlants, savePlants, loadSession, saveSession, resetGarden } from '../lib/storage.js'
+import {
+  loadPlants,
+  savePlants,
+  loadSession,
+  saveSession,
+  resetGarden,
+  peekFreshTab,
+  markTabAlive,
+} from '../lib/storage.js'
 import { isSpotValid } from '../lib/placement.js'
 
 // Reconcile stored state on startup:
-// - active session still within its duration -> resume it
-// - session whose duration elapsed while the tab was closed -> plant completes
+// - active session still within its duration, same tab (reload) -> resume it
+// - active session still within its duration, fresh tab (closed + reopened,
+//   or a new tab entirely) -> wilt it, since only a reload counts as "kept
+//   the tab open"
+// - session whose duration elapsed while away -> plant completes
 // - orphaned "growing" plants (no matching session) -> wilt them small
 function loadInitial() {
   let plants = loadPlants()
   let session = loadSession()
   let toast = null
+  const freshTab = peekFreshTab()
 
   if (session) {
     const plant = plants.find((p) => p.id === session.plantId && p.status === 'growing')
@@ -23,6 +35,14 @@ function loadInitial() {
           p.id === plant.id ? { ...p, status: 'complete' } : p,
         )
         toast = `Your ${friendlyName(plant.tier, plant.variationIndex)} finished growing while you were away 🌿`
+        session = null
+      } else if (freshTab) {
+        const progress = elapsed / session.durationMs
+        const grown = Math.max(0.3, growthScale(progress))
+        plants = plants.map((p) =>
+          p.id === plant.id ? { ...p, status: 'wilted', scale: p.scale * grown } : p,
+        )
+        toast = `Your ${friendlyName(plant.tier, plant.variationIndex)} wilted while the tab was closed.`
         session = null
       }
     }
@@ -60,6 +80,7 @@ export default function useGrove() {
 
   useEffect(() => savePlants(plants), [plants])
   useEffect(() => saveSession(session), [session])
+  useEffect(() => markTabAlive(), [])
 
   // Hidden dev helper: window.__groveReset() wipes the garden.
   useEffect(() => {

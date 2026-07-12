@@ -40,3 +40,21 @@ export function resetGarden() {
   localStorage.removeItem(PLANTS_KEY)
   localStorage.removeItem(SESSION_KEY)
 }
+
+const TAB_ALIVE_KEY = 'grove.tabAlive.v1'
+
+// sessionStorage survives a reload but is wiped when a tab is closed, so it
+// doubles as a "is this the same tab as before" signal: true only before the
+// first time markTabAlive() has run in a given tab (a fresh tab, or one
+// reopened after close). Read-only and side-effect-free so it's safe to call
+// from a useState lazy initializer, which React (StrictMode) may invoke more
+// than once per mount.
+export function peekFreshTab() {
+  return !sessionStorage.getItem(TAB_ALIVE_KEY)
+}
+
+// Call once per mount (from an effect, not a lazy initializer) to record
+// that this tab has been seen.
+export function markTabAlive() {
+  sessionStorage.setItem(TAB_ALIVE_KEY, '1')
+}
