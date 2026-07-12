@@ -12,11 +12,16 @@ everything persists to `localStorage`. Dev server: `npm run dev`
 
 ## Locked design decisions — do not relitigate these without asking
 
-- **Sessions survive reload/tab-close.** Timing is timestamp-based
+- **Sessions survive reload, but not tab-close.** Timing is timestamp-based
   (`startedAt` + `durationMs` in `localStorage`), not a running interval, so
-  closing the tab and coming back mid-session just resumes correctly.
-  Returning *after* the duration already elapsed marks the plant complete.
-  Only the explicit in-app "Give up" → "Let it wilt" flow wilts a plant.
+  hitting refresh mid-session just resumes correctly. Closing the tab (or the
+  whole browser) and coming back wilts the in-progress plant instead — a
+  `sessionStorage` marker (`src/lib/storage.js` `peekFreshTab`/
+  `markTabAlive`) distinguishes a reload from a fresh tab, since
+  `sessionStorage` survives the former but not the latter. Returning *after*
+  the duration already elapsed (regardless of reload vs. close) marks the
+  plant complete instead. The explicit in-app "Give up" → "Let it wilt" flow
+  also wilts a plant, same as before.
 - **No pause button.** Strictly complete-or-cancel.
 - **Wilted plants persist forever.** No delete UI. The only reset path is
   the console helper `window.__groveReset()`.
