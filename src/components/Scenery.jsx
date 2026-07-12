@@ -82,7 +82,8 @@ function buildScenery() {
       const t = (i + 0.5) / steps
       const px = ax + (bx - ax) * t
       const pz = az + (bz - az) * t
-      if (Math.hypot(px, pz) > GARDEN_RADIUS + 1.5) continue
+      // path now runs a little past the clearing edge, up to the house
+      if (Math.hypot(px, pz) > GARDEN_RADIUS + 4) continue
       // lateral wobble so stones don't sit in a perfect line
       const nx = -(bz - az) / len
       const nz = (bx - ax) / len

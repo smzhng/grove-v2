@@ -1,11 +1,12 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { windTime } from '../lib/sway.js'
 import { isSpotValid, GARDEN_RADIUS } from '../lib/placement.js'
 import { TIERS } from '../constants.js'
-import Ground from './Ground.jsx'
+import World from './World.jsx'
+import House, { HOUSE_POSITION } from './House.jsx'
 import Scenery from './Scenery.jsx'
 import Plant from './Plant.jsx'
 import PlantAsset from './PlantAsset.jsx'
@@ -253,10 +254,16 @@ function IntroRig({ go, onDone }) {
 
 const REST_POSITION = new THREE.Vector3(12, 7.5, 16)
 
-// Eases the camera back to the default resting view when `signal` changes
-// (a simple incrementing counter from the parent). Takes over from
-// OrbitControls for the duration, then hands control back.
-function RecenterRig({ signal, controlsRef, setEnabled }) {
+// Close-up view of the house: a three-quarter angle from the path side, so
+// the sunlit east face and the porch both read (dead-on south is in shadow).
+const HOUSE_VIEW_POSITION = new THREE.Vector3(HOUSE_POSITION[0] + 5.5, 3.4, HOUSE_POSITION[2] - 6.3)
+const HOUSE_VIEW_TARGET = new THREE.Vector3(HOUSE_POSITION[0], 1.6, HOUSE_POSITION[2])
+
+// Eases the camera to a destination pose when `signal` changes (a simple
+// incrementing counter from the parent). Takes over from OrbitControls for
+// the duration, then hands control back with the orbit pivot moved too.
+// Used for both "recenter view" and "look at the house".
+function FlyToRig({ signal, camPos, lookAt, controlsRef, setEnabled }) {
   const t = useRef(0)
   const active = useRef(false)
   const prevSignal = useRef(signal)
@@ -276,8 +283,8 @@ function RecenterRig({ signal, controlsRef, setEnabled }) {
     if (!active.current) return
     t.current = Math.min(t.current + delta / 1.1, 1)
     const e = 1 - Math.pow(1 - t.current, 3)
-    state.camera.position.lerpVectors(start.current, REST_POSITION, e)
-    target.current.lerpVectors(startTarget.current, ORBIT_TARGET, e)
+    state.camera.position.lerpVectors(start.current, camPos, e)
+    target.current.lerpVectors(startTarget.current, lookAt, e)
     state.camera.lookAt(target.current)
     if (controlsRef.current) controlsRef.current.target.copy(target.current)
     if (t.current >= 1) {
@@ -302,21 +309,30 @@ export default function GardenCanvas({
 }) {
   const [introDone, setIntroDone] = useState(!intro)
   const [controlsEnabled, setControlsEnabled] = useState(!intro)
+  const [houseSignal, setHouseSignal] = useState(0)
+  // While inspecting the house the orbit pivot sits on it, so the zoom-out
+  // leash shrinks — otherwise "zoom out" retreats deep into the treeline.
+  const [focusHouse, setFocusHouse] = useState(false)
   const controlsRef = useRef()
+  useEffect(() => {
+    if (recenterSignal > 0) setFocusHouse(false)
+  }, [recenterSignal])
   return (
     <Canvas
       shadows
       camera={{ position: intro ? introStartPosition() : [12, 7.5, 16], fov: 42 }}
       gl={{ antialias: true }}
       className="!absolute inset-0"
-      onCreated={({ camera }) => {
+      onCreated={({ camera, scene }) => {
         camera.lookAt(ORBIT_TARGET)
+        // dev helper, same spirit as window.__groveReset
+        window.__groveDebug = { camera, scene }
         onReady?.()
       }}
     >
       {/* warm, calm grade under a blue gradient sky */}
       <Sky />
-      <fog attach="fog" args={['#ddecf6', 42, 95]} />
+      <fog attach="fog" args={['#ddecf6', 45, 105]} />
       <ambientLight intensity={0.55} color="#fff3e0" />
       <hemisphereLight args={['#cbe2f7', '#a89369', 0.6]} />
       <directionalLight
@@ -325,16 +341,23 @@ export default function GardenCanvas({
         intensity={1.7}
         color="#ffe6bd"
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-left={-24}
+        shadow-camera-right={24}
+        shadow-camera-top={24}
+        shadow-camera-bottom={-24}
         shadow-camera-near={1}
         shadow-camera-far={60}
         shadow-bias={-0.0004}
       />
 
-      <Ground />
+      <World />
+      <House
+        onFocus={() => {
+          setFocusHouse(true)
+          setHouseSignal((n) => n + 1)
+        }}
+        disabled={!!placing}
+      />
       <Scenery />
       {plants.map((p) => (
         <Plant key={p.id} plant={p} session={session} />
@@ -357,7 +380,22 @@ export default function GardenCanvas({
         />
       )}
       {introDone && (
-        <RecenterRig signal={recenterSignal} controlsRef={controlsRef} setEnabled={setControlsEnabled} />
+        <>
+          <FlyToRig
+            signal={recenterSignal}
+            camPos={REST_POSITION}
+            lookAt={ORBIT_TARGET}
+            controlsRef={controlsRef}
+            setEnabled={setControlsEnabled}
+          />
+          <FlyToRig
+            signal={houseSignal}
+            camPos={HOUSE_VIEW_POSITION}
+            lookAt={HOUSE_VIEW_TARGET}
+            controlsRef={controlsRef}
+            setEnabled={setControlsEnabled}
+          />
+        </>
       )}
       <OrbitControls
         ref={controlsRef}
@@ -366,7 +404,7 @@ export default function GardenCanvas({
         dampingFactor={0.08}
         enablePan={false}
         minDistance={5}
-        maxDistance={45}
+        maxDistance={focusHouse ? 10 : 22}
         maxPolarAngle={Math.PI * 0.46}
         target={[0, 0.8, 0]}
       />

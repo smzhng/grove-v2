@@ -40,7 +40,14 @@ everything persists to `localStorage`. Dev server: `npm run dev`
 - `src/constants.js` — tier definitions, growth-stage naming, friendly plant
   names, formatting helpers.
 - `src/components/GardenCanvas.jsx` — the r3f `<Canvas>`, lighting, gradient
-  sky, camera/orbit controls.
+  sky, camera/orbit controls + camera glide rigs (entry orbit, recenter,
+  house focus), ghost-placement + planting-ritual FX.
+- `src/components/World.jsx` — the rainforest world around the clearing
+  (seeded): jungle treeline boundary, creek/ponds, hilly wilderness,
+  fog-swallowed mountains. The world edge must never be visible — zoom is
+  capped and fog swallows the terrain rim.
+- `src/components/House.jsx` — the clickable stilted cabin at the path's
+  end (click = camera glide; its real purpose is a future update).
 - `src/components/TimerOverlay.jsx` — the Tailwind UI on top of the canvas
   (tier picker, running session card w/ progress ring, toasts).
 - `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen:
