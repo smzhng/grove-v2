@@ -254,6 +254,26 @@ function IntroRig({ go, onDone }) {
 
 const REST_POSITION = new THREE.Vector3(12, 7.5, 16)
 
+// Eye-level view of a growing plant: height and distance scale with the
+// tier's clearance radius so small sprouts aren't viewed from a giant's eye
+// and grand trees aren't viewed from inside their own trunk. The camera
+// sits a little above its own look-height so it stays within the orbit
+// controls' polar-angle range instead of landing exactly horizontal.
+function plantFocusPose(plant) {
+  const clearance = TIERS[plant.tier].clearance
+  const eyeY = 0.6 + clearance * 0.5
+  const radius = 1.8 + clearance * 1.2
+  const angle = 0.6
+  return {
+    target: new THREE.Vector3(plant.x, eyeY, plant.z),
+    camPos: new THREE.Vector3(
+      plant.x + Math.cos(angle) * radius,
+      eyeY + radius * 0.22,
+      plant.z + Math.sin(angle) * radius,
+    ),
+  }
+}
+
 // Close-up view of the house: a three-quarter angle from the path side, so
 // the sunlit east face and the porch both read (dead-on south is in shadow).
 const HOUSE_VIEW_POSITION = new THREE.Vector3(HOUSE_POSITION[0] + 5.5, 3.4, HOUSE_POSITION[2] - 6.3)
@@ -300,7 +320,7 @@ function FlyToRig({ signal, camPos, lookAt, controlsRef, setEnabled }) {
 // to a fixed height (screen-space panning would otherwise drag it up into
 // the sky). Runs after OrbitControls' own update each frame.
 const MAX_TARGET_RADIUS = 48
-function PanBoundsRig({ controlsRef, active }) {
+function PanBoundsRig({ controlsRef, active, homeY = ORBIT_TARGET.y }) {
   useFrame(() => {
     if (!active) return
     const controls = controlsRef.current
@@ -314,8 +334,8 @@ function PanBoundsRig({ controlsRef, active }) {
       t.z *= s
       changed = true
     }
-    if (Math.abs(t.y - ORBIT_TARGET.y) > 0.01) {
-      t.y = ORBIT_TARGET.y
+    if (Math.abs(t.y - homeY) > 0.01) {
+      t.y = homeY
       changed = true
     }
     if (changed) controls.update()
@@ -385,8 +405,38 @@ export default function GardenCanvas({
   const [focusHouse, setFocusHouse] = useState(false)
   const controlsRef = useRef()
   useEffect(() => {
-    if (recenterSignal > 0) setFocusHouse(false)
+    if (recenterSignal > 0) {
+      setFocusHouse(false)
+      setSessionFocused(false)
+    }
   }, [recenterSignal])
+
+  // While a session is running, the camera flies to eye-level with the
+  // growing plant and orbits it (still overridable by drag/zoom, same as
+  // idle drift, which naturally continues orbiting whatever the current
+  // pivot is). Fires on a fresh plant right after PlantingFX finishes, and
+  // also on mount if a session is already active (resumed from a reload).
+  const [focusPlant, setFocusPlant] = useState(null)
+  const [sessionFocused, setSessionFocused] = useState(false)
+  const [plantFocusSignal, setPlantFocusSignal] = useState(0)
+  const [homeSignal, setHomeSignal] = useState(0)
+  const prevSessionId = useRef(session?.plantId ?? null)
+  useEffect(() => {
+    const id = session?.plantId ?? null
+    if (id && id !== prevSessionId.current) {
+      const plant = plants.find((p) => p.id === id)
+      if (plant) {
+        setFocusPlant(plant)
+        setSessionFocused(true)
+        setPlantFocusSignal((n) => n + 1)
+      }
+    } else if (!id && prevSessionId.current) {
+      setSessionFocused(false)
+      setHomeSignal((n) => n + 1)
+    }
+    prevSessionId.current = id
+  }, [session, plants])
+  const plantPose = useMemo(() => (focusPlant ? plantFocusPose(focusPlant) : null), [focusPlant])
   return (
     <Canvas
       shadows
@@ -465,9 +515,29 @@ export default function GardenCanvas({
             controlsRef={controlsRef}
             setEnabled={setControlsEnabled}
           />
+          {plantPose && (
+            <FlyToRig
+              signal={plantFocusSignal}
+              camPos={plantPose.camPos}
+              lookAt={plantPose.target}
+              controlsRef={controlsRef}
+              setEnabled={setControlsEnabled}
+            />
+          )}
+          <FlyToRig
+            signal={homeSignal}
+            camPos={REST_POSITION}
+            lookAt={ORBIT_TARGET}
+            controlsRef={controlsRef}
+            setEnabled={setControlsEnabled}
+          />
         </>
       )}
-      <PanBoundsRig controlsRef={controlsRef} active={controlsEnabled} />
+      <PanBoundsRig
+        controlsRef={controlsRef}
+        active={controlsEnabled}
+        homeY={sessionFocused && plantPose ? plantPose.target.y : ORBIT_TARGET.y}
+      />
       <IdleDriftRig controlsRef={controlsRef} active={controlsEnabled} />
       <OrbitControls
         ref={controlsRef}
@@ -477,9 +547,9 @@ export default function GardenCanvas({
         enablePan
         panSpeed={0.7}
         screenSpacePanning={false}
-        minDistance={5}
-        maxDistance={focusHouse ? 10 : 22}
-        maxPolarAngle={Math.PI * 0.46}
+        minDistance={sessionFocused ? 1.2 : 5}
+        maxDistance={sessionFocused ? 9 : focusHouse ? 10 : 22}
+        maxPolarAngle={sessionFocused ? Math.PI * 0.5 : Math.PI * 0.46}
         target={ORBIT_TARGET}
       />
     </Canvas>
