@@ -28,12 +28,20 @@ everything persists to `localStorage`. Dev server: `npm run dev`
 - **Hidden dev speed-up**: append `?speed=N` to the URL to make sessions run
   N× faster (shows a small "dev speed ×N" badge). Useful for testing growth/
   completion/wilt without waiting hours.
-- **Plant visuals are placeholder primitives**, isolated entirely in
-  `src/components/PlantAsset.jsx` (cones/spheres/cylinders/boxes only). That
-  file has a commented-out map of the real GLTF filenames it should
-  eventually load — **do not add `GLTFLoader` or any `three/examples/jsm`
-  import until explicitly asked to.** Same goes for `src/components/
-  Scenery.jsx` (decorative rocks/pebbles/path/petals — also placeholders).
+- **Plant visuals load real GLTF models now** (as of 2026-07-12), isolated
+  entirely in `src/components/PlantAsset.jsx`. Models live in `public/models/`
+  (not `src/` — the multi-file gltfs reference sibling `.bin`/texture files
+  by relative path, and `public/` serves them flat/unhashed so those
+  references keep working). Loaded via drei's `useGLTF`, keyed by the
+  `ASSET_MAP` in that file, cloned per instance, with wind sway patched onto
+  the model's own materials (`applySway` in `src/lib/sway.js`) so baked
+  textures are preserved. A missing/failed load falls back to the original
+  primitive placeholder builders (still in the same file) instead of
+  leaving a gap in the garden — so those builders stay, they're just the
+  fallback now, not the default. **`src/components/Scenery.jsx`** (decorative
+  rocks/pebbles/path/petals) is still placeholder-only — the matching real
+  models already exist in `public/models/` (same drop) but porting Scenery.jsx
+  to load them hasn't been asked for yet.
 
 ## Where things live
 
