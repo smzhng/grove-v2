@@ -49,3 +49,41 @@ export function swayMaterial(color, { roughness = 0.9 } = {}) {
   cache.set(key, mat)
   return mat
 }
+
+const swayed = new WeakSet()
+
+// Same wind displacement as swayMaterial(), but patched onto an existing
+// material in place instead of creating a new one — for real GLTF models,
+// whose materials already carry their own baked textures/colors we want to
+// keep. Idempotent, since loaded models are cloned (and share materials)
+// per instance.
+export function applySway(material) {
+  if (!material || swayed.has(material)) return material
+  swayed.add(material)
+
+  const prevOnBeforeCompile = material.onBeforeCompile
+  material.onBeforeCompile = (shader, renderer) => {
+    prevOnBeforeCompile?.(shader, renderer)
+    shader.uniforms.uTime = windTime
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         uniform float uTime;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+         {
+           vec4 groveWorld = modelMatrix * vec4(transformed, 1.0);
+           float groveH = max(groveWorld.y, 0.0);
+           float groveF = min(groveH * groveH, 12.0) * 0.014;
+           float grovePhase = groveWorld.x * 0.55 + groveWorld.z * 0.55;
+           transformed.x += sin(uTime * 1.35 + grovePhase) * groveF;
+           transformed.z += sin(uTime * 1.05 + grovePhase * 1.3 + 1.7) * groveF * 0.55;
+         }`,
+      )
+  }
+  material.needsUpdate = true
+  return material
+}

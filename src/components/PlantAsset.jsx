@@ -1,71 +1,68 @@
-import { useMemo } from 'react'
+import { Component, Suspense, useMemo } from 'react'
 import * as THREE from 'three'
-import { swayMaterial } from '../lib/sway.js'
+import { useGLTF } from '@react-three/drei'
+import { swayMaterial, applySway } from '../lib/sway.js'
 
-/*
- * PlantAsset — the ONLY place plant visuals live.
- *
- * Currently renders primitive placeholders (cones/spheres/cylinders/boxes).
- * When the real GLTF models are ready, swap the placeholder builder for a
- * loader keyed by this map, without touching the timer or placement engines:
- *
- * const ASSET_MAP = {
- *   sprout: [
- *     'Clover_1.gltf',
- *     'Clover_2.gltf',
- *     'Grass_Common_Short.gltf',
- *     'Grass_Wispy_Short.gltf',
- *     'Mushroom_Common.gltf',
- *   ],
- *   small: [
- *     'Grass_Common_Tall.gltf',
- *     'Grass_Wispy_Tall.gltf',
- *     'Fern_1.gltf',
- *     'Flower_3_Single.gltf',
- *     'Flower_4_Single.gltf',
- *     'Plant_1.gltf',
- *     'Plant_7.gltf',
- *   ],
- *   medium: [
- *     'Flower_3_Group.gltf',
- *     'Flower_4_Group.gltf',
- *     'Plant_1_Big.gltf',
- *     'Plant_7_Big.gltf',
- *     'Mushroom_Laetiporus.gltf',
- *     'Bush_Common.gltf',
- *   ],
- *   large: [
- *     'Bush_Common_Flowers.gltf',
- *     'Pine_1.gltf',
- *     'Pine_2.gltf',
- *     'Pine_3.gltf',
- *     'Pine_4.gltf',
- *     'Pine_5.gltf',
- *   ],
- *   hero: [
- *     'CommonTree_1.gltf',
- *     'CommonTree_2.gltf',
- *     'CommonTree_3.gltf',
- *     'CommonTree_4.gltf',
- *     'CommonTree_5.gltf',
- *     'TwistedTree_1.gltf',
- *     'TwistedTree_2.gltf',
- *     'TwistedTree_3.gltf',
- *     'TwistedTree_4.gltf',
- *     'TwistedTree_5.gltf',
- *   ],
- *   wilted: [
- *     'DeadTree_1.gltf',
- *     'DeadTree_2.gltf',
- *     'DeadTree_3.gltf',
- *     'DeadTree_4.gltf',
- *     'DeadTree_5.gltf',
- *   ],
- *   // Decorative scenery (see Scenery.jsx):
- *   // Pebble_Round_1..5, Pebble_Square_1..6, Rock_Medium_1..3,
- *   // RockPath pieces, Petal_1..5
- * }
- */
+// PlantAsset — the ONLY place plant visuals live. Real GLTF models (in
+// public/models/) are tried first, keyed by tier/variationIndex below; the
+// primitive placeholder builders further down are the fallback for a file
+// that's missing or fails to load.
+const ASSET_MAP = {
+  sprout: [
+    'Clover_1.gltf',
+    'Clover_2.gltf',
+    'Grass_Common_Short.gltf',
+    'Grass_Wispy_Short.gltf',
+    'Mushroom_Common.gltf',
+  ],
+  small: [
+    'Grass_Common_Tall.gltf',
+    'Grass_Wispy_Tall.gltf',
+    'Fern_1.gltf',
+    'Flower_3_Single.gltf',
+    'Flower_4_Single.gltf',
+    'Plant_1.gltf',
+    'Plant_7.gltf',
+  ],
+  medium: [
+    'Flower_3_Group.gltf',
+    'Flower_4_Group.gltf',
+    'Plant_1_Big.gltf',
+    'Plant_7_Big.gltf',
+    'Mushroom_Laetiporus.gltf',
+    'Bush_Common.gltf',
+  ],
+  large: [
+    'Bush_Common_Flowers.gltf',
+    'Pine_1.gltf',
+    'Pine_2.gltf',
+    'Pine_3.gltf',
+    'Pine_4.gltf',
+    'Pine_5.gltf',
+  ],
+  hero: [
+    'CommonTree_1.gltf',
+    'CommonTree_2.gltf',
+    'CommonTree_3.gltf',
+    'CommonTree_4.gltf',
+    'CommonTree_5.gltf',
+    'TwistedTree_1.gltf',
+    'TwistedTree_2.gltf',
+    'TwistedTree_3.gltf',
+    'TwistedTree_4.gltf',
+    'TwistedTree_5.gltf',
+  ],
+  wilted: [
+    'DeadTree_1.gltf',
+    'DeadTree_2.gltf',
+    'DeadTree_3.gltf',
+    'DeadTree_4.gltf',
+    'DeadTree_5.gltf',
+  ],
+  // Decorative scenery (see Scenery.jsx):
+  // Pebble_Round_1..5, Pebble_Square_1..6, Rock_Medium_1..3,
+  // RockPath pieces, Petal_1..5
+}
 
 // Four shared unit geometries; every part is a scaled/rotated instance.
 const GEO = {
@@ -336,8 +333,9 @@ function buildWilted(tier, vi, add) {
 }
 
 // overrideMaterial replaces every part's material — used for the translucent
-// ghost preview during placement.
-export default function PlantAsset({ tier, variationIndex, isWilted, overrideMaterial }) {
+// ghost preview during placement, which always uses this placeholder (a real
+// textured model doesn't need to look right as a translucent silhouette).
+function PlaceholderAsset({ tier, variationIndex, isWilted, overrideMaterial }) {
   const parts = useMemo(() => {
     const list = []
     const add = (geo, mat, pos, scl, rot = [0, 0, 0]) => list.push({ geo, mat, pos, scl, rot })
@@ -364,5 +362,66 @@ export default function PlantAsset({ tier, variationIndex, isWilted, overrideMat
         />
       ))}
     </group>
+  )
+}
+
+// Loads one real GLTF model and clones it per instance (the loader caches
+// and shares the source scene, so every placed plant needs its own copy of
+// the object hierarchy — geometries/materials are still shared, only the
+// Object3D nodes are duplicated). Wind sway is patched onto the model's own
+// materials in place, keeping their baked textures.
+function GLTFAsset({ file }) {
+  const { scene } = useGLTF(`/models/${file}`)
+  const instance = useMemo(() => {
+    const clone = scene.clone(true)
+    clone.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+        applySway(obj.material)
+      }
+    })
+    return clone
+  }, [scene])
+  return <primitive object={instance} />
+}
+
+// Catches a failed/missing GLTF load and falls back to the placeholder
+// instead of leaving a gap in the garden.
+class ModelBoundary extends Component {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  componentDidCatch(error) {
+    console.warn('[grove] falling back to placeholder for a plant model:', error)
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
+}
+
+export default function PlantAsset({ tier, variationIndex, isWilted, overrideMaterial }) {
+  const file = isWilted
+    ? ASSET_MAP.wilted[variationIndex % ASSET_MAP.wilted.length]
+    : ASSET_MAP[tier]?.[variationIndex]
+
+  const placeholder = (
+    <PlaceholderAsset
+      tier={tier}
+      variationIndex={variationIndex}
+      isWilted={isWilted}
+      overrideMaterial={overrideMaterial}
+    />
+  )
+
+  if (overrideMaterial || !file) return placeholder
+
+  return (
+    <ModelBoundary fallback={placeholder}>
+      <Suspense fallback={placeholder}>
+        <GLTFAsset file={file} />
+      </Suspense>
+    </ModelBoundary>
   )
 }
