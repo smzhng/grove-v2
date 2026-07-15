@@ -359,6 +359,12 @@ function PlaceholderAsset({ tier, variationIndex, isWilted, overrideMaterial }) 
           position={p.pos}
           scale={p.scl}
           rotation={p.rot}
+          // Plant visuals are decorative only — never a raycast target.
+          // Without this, an already-placed plant sitting between the
+          // camera and the ground can block the invisible placement plane
+          // in GardenCanvas's GhostPlanter from ever receiving pointer
+          // events, breaking hover/click for planting new ones.
+          raycast={() => null}
         />
       ))}
     </group>
@@ -379,6 +385,8 @@ function GLTFAsset({ file }) {
         obj.castShadow = true
         obj.receiveShadow = true
         applySway(obj.material)
+        // Same reasoning as the placeholder path above: decorative only.
+        obj.raycast = () => null
       }
     })
     return clone
