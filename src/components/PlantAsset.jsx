@@ -409,7 +409,13 @@ class ModelBoundary extends Component {
   }
 }
 
-export default function PlantAsset({ tier, variationIndex, isWilted, overrideMaterial }) {
+export default function PlantAsset({
+  tier,
+  variationIndex,
+  isWilted,
+  overrideMaterial,
+  forcePlaceholder,
+}) {
   const file = isWilted
     ? ASSET_MAP.wilted[variationIndex % ASSET_MAP.wilted.length]
     : ASSET_MAP[tier]?.[variationIndex]
@@ -423,7 +429,7 @@ export default function PlantAsset({ tier, variationIndex, isWilted, overrideMat
     />
   )
 
-  if (overrideMaterial || !file) return placeholder
+  if (overrideMaterial || !file || forcePlaceholder) return placeholder
 
   return (
     <ModelBoundary fallback={placeholder}>

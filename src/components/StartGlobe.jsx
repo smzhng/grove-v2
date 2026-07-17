@@ -8,8 +8,9 @@ import PlantAsset from './PlantAsset.jsx'
  * The start-menu globe: a little planet whose top dome carries a hand-placed
  * "end-game" garden — what an accumulated Grove can look like. It spins
  * slowly; plants sway with the same wind shader as the real garden. Built
- * from the same PlantAsset placeholders, so it upgrades automatically when
- * real models arrive.
+ * from PlantAsset, forced to its low-poly placeholder mode (forcePlaceholder)
+ * — real GLTF models are too heavy for ~20 simultaneous decorative instances
+ * spinning in the background.
  *
  * On "Enter the garden" the camera flies forward and down over the dome like
  * an airplane on final approach while the planet rolls toward the viewer;
@@ -147,7 +148,7 @@ function Globe({ flying }) {
           const pose = surfacePose(polar, az, i * 1.7)
           return (
             <group key={i} position={pose.position} quaternion={pose.quaternion} scale={s * 1.2}>
-              <PlantAsset tier={tier} variationIndex={vi} isWilted={false} />
+              <PlantAsset tier={tier} variationIndex={vi} isWilted={false} forcePlaceholder />
             </group>
           )
         })}
