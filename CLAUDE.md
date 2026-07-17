@@ -66,21 +66,25 @@ everything persists to `localStorage`. Dev server: `npm run dev`
   end (click = camera glide; its real purpose is a future update).
 - `src/components/TimerOverlay.jsx` — the Tailwind UI on top of the canvas
   (tier picker, running session card w/ progress ring, toasts).
-- `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen, now
-  a **world-select grid** (as of 2026-07-12): spinning showcase planet
-  (hand-placed "end-game" garden on a big sphere) as the backdrop, wordmark,
-  focus stat, then a row of world tiles. Only "Forest" (the original/only
-  real garden) is playable — clicking it does what "Enter the garden" used
-  to. The other 5 (Fishing Village, The Waterfall, The Cave, Abandoned
-  Woodlands, The Village) are locked teasers — silhouette + hover hint,
-  same visual language as the library's locked cards — for worlds that are
-  hand-designed in concept but not built yet (see project memory for the
-  narrative direction: a mentor/keeper character in the home forest, each
-  other world unlocked by an NPC invite tied to real accumulated focus).
-  Shown on every open *unless* a session is mid-run (silent resume skips
-  it). The menu stays up covering the garden load, then fades once the
-  scene reports ready. `src/components/SettingsPanel.jsx` is a small overlay
-  opened from a gear icon on this screen, currently just "Reset garden".
+- `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen:
+  spinning showcase planet (hand-placed "end-game" garden on a big sphere,
+  forced to `PlantAsset`'s low-poly placeholder mode via `forcePlaceholder`
+  — real GLTF models are too heavy for ~20 simultaneous background
+  instances) as the backdrop, wordmark, focus stat, "Enter the garden" as
+  the single primary action (unchanged from before). Two icon buttons,
+  top-right: **Worlds** opens `WorldSelectPanel.jsx` (as of 2026-07-12) — a
+  secondary/browse panel, not the default view — showing "Forest" (the
+  only real, playable world; picking it does what "Enter the garden" does)
+  plus 5 locked teaser tiles (Fishing Village, The Waterfall, The Cave,
+  Abandoned Woodlands, The Village — silhouette + hover hint, same visual
+  language as the library's locked cards) for worlds that are hand-designed
+  in concept but not built yet (see project memory for the narrative
+  direction: a mentor/keeper character in the home forest, each other world
+  unlocked by an NPC invite tied to real accumulated focus). **Settings**
+  opens `SettingsPanel.jsx`, currently just "Reset garden". The menu is
+  shown on every open *unless* a session is mid-run (silent resume skips
+  it), stays up covering the garden load, then fades once the scene
+  reports ready.
 
 ## History and provenance
 
