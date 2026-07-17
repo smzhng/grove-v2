@@ -23,8 +23,11 @@ everything persists to `localStorage`. Dev server: `npm run dev`
   plant complete instead. The explicit in-app "Give up" → "Let it wilt" flow
   also wilts a plant, same as before.
 - **No pause button.** Strictly complete-or-cancel.
-- **Wilted plants persist forever.** No delete UI. The only reset path is
-  the console helper `window.__groveReset()`.
+- **Wilted plants persist forever.** No per-plant delete UI. Resetting the
+  *whole* garden is possible via the Settings panel on the landing screen
+  (`src/components/SettingsPanel.jsx`, "Reset garden", behind a two-step
+  confirm) as of 2026-07-12 — this promotes what was previously only the
+  console helper `window.__groveReset()`, which still also works.
 - **Hidden dev speed-up**: append `?speed=N` to the URL to make sessions run
   N× faster (shows a small "dev speed ×N" badge). Useful for testing growth/
   completion/wilt without waiting hours.
@@ -63,11 +66,21 @@ everything persists to `localStorage`. Dev server: `npm run dev`
   end (click = camera glide; its real purpose is a future update).
 - `src/components/TimerOverlay.jsx` — the Tailwind UI on top of the canvas
   (tier picker, running session card w/ progress ring, toasts).
-- `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen:
-  spinning showcase planet (hand-placed "end-game" garden on a big sphere),
-  wordmark, focus stat, "Enter the garden". Shown on every open *unless* a
-  session is mid-run (silent resume skips it). The menu stays up covering
-  the garden load, then fades once the scene reports ready.
+- `src/components/StartMenu.jsx` + `StartGlobe.jsx` — the landing screen, now
+  a **world-select grid** (as of 2026-07-12): spinning showcase planet
+  (hand-placed "end-game" garden on a big sphere) as the backdrop, wordmark,
+  focus stat, then a row of world tiles. Only "Forest" (the original/only
+  real garden) is playable — clicking it does what "Enter the garden" used
+  to. The other 5 (Fishing Village, The Waterfall, The Cave, Abandoned
+  Woodlands, The Village) are locked teasers — silhouette + hover hint,
+  same visual language as the library's locked cards — for worlds that are
+  hand-designed in concept but not built yet (see project memory for the
+  narrative direction: a mentor/keeper character in the home forest, each
+  other world unlocked by an NPC invite tied to real accumulated focus).
+  Shown on every open *unless* a session is mid-run (silent resume skips
+  it). The menu stays up covering the garden load, then fades once the
+  scene reports ready. `src/components/SettingsPanel.jsx` is a small overlay
+  opened from a gear icon on this screen, currently just "Reset garden".
 
 ## History and provenance
 
