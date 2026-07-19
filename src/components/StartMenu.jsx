@@ -4,55 +4,25 @@ import SettingsPanel from './SettingsPanel.jsx'
 import WorldSelectPanel from './WorldSelectPanel.jsx'
 import { TIERS, formatTotalMinutes } from '../constants.js'
 
-const card =
-  'rounded-[18px] border border-[#5a6946]/20 bg-[#faf9f0]/90 shadow-[0_10px_34px_rgba(50,65,38,0.16)] backdrop-blur-md'
-
-function IconButton({ onClick, label, children }) {
+function MenuButton({ onClick, disabled, children }) {
   return (
     <button
       onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`pointer-events-auto grid h-10 w-10 cursor-pointer place-items-center text-[#5c6b4d] transition hover:text-[#38452e] ${card}`}
+      disabled={disabled}
+      className="pointer-events-auto cursor-pointer rounded-xl border border-[#5a6946]/30 bg-white/55 px-8 py-2.5 text-[14.5px] font-medium text-[#5c6b4d] transition hover:-translate-y-0.5 hover:bg-white/85 disabled:cursor-default disabled:translate-y-0"
     >
       {children}
     </button>
   )
 }
 
-function WorldsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.3 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.3-3.8-8.5S9.5 5.8 12 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M18 6l-1.4 1.4M7.4 16.6L6 18"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 // Landing screen: the showcase planet fills the whole view with the title
 // block floating in the sky above it. "Enter the garden" fades the text,
 // flies the camera down onto the planet like a landing approach, then the
-// whole menu fades into the real garden once it's ready. "Worlds" opens a
-// secondary panel previewing the other (locked, unbuilt) worlds — browsing,
-// not the default flow, since Forest is the only one that actually exists.
+// whole menu fades into the real garden once it's ready. "Worlds" and
+// "Settings" sit as secondary buttons underneath — "Worlds" opens a panel
+// previewing the other (locked, unbuilt) worlds, not the default flow,
+// since Forest is the only one that actually exists.
 export default function StartMenu({ plants, entering, fadeOut, onEnter, onFlightDone, onGone }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [worldsOpen, setWorldsOpen] = useState(false)
@@ -72,17 +42,6 @@ export default function StartMenu({ plants, entering, fadeOut, onEnter, onFlight
       <div className="absolute inset-0">
         <StartGlobe flying={entering} onFlightDone={onFlightDone} />
       </div>
-
-      {!entering && (
-        <div className="pointer-events-auto absolute top-5 right-5 z-10 flex gap-2">
-          <IconButton label="Worlds" onClick={() => setWorldsOpen(true)}>
-            <WorldsIcon />
-          </IconButton>
-          <IconButton label="Settings" onClick={() => setSettingsOpen(true)}>
-            <SettingsIcon />
-          </IconButton>
-        </div>
-      )}
 
       <div
         className={`pointer-events-none relative z-10 flex flex-col items-center pt-[13vh] text-center transition-opacity duration-500 ${
@@ -104,6 +63,14 @@ export default function StartMenu({ plants, entering, fadeOut, onEnter, onFlight
         >
           Enter the garden
         </button>
+        <div className="mt-3 flex flex-col items-center gap-2">
+          <MenuButton onClick={() => setWorldsOpen(true)} disabled={entering}>
+            Worlds
+          </MenuButton>
+          <MenuButton onClick={() => setSettingsOpen(true)} disabled={entering}>
+            Settings
+          </MenuButton>
+        </div>
       </div>
 
       <WorldSelectPanel
