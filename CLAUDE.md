@@ -71,9 +71,10 @@ everything persists to `localStorage`. Dev server: `npm run dev`
   forced to `PlantAsset`'s low-poly placeholder mode via `forcePlaceholder`
   — real GLTF models are too heavy for ~20 simultaneous background
   instances) as the backdrop, wordmark, focus stat, "Enter the garden" as
-  the single primary action (unchanged from before). Two icon buttons,
-  top-right: **Worlds** opens `WorldSelectPanel.jsx` (as of 2026-07-12) — a
-  secondary/browse panel, not the default view — showing "Forest" (the
+  the single primary action (unchanged from before), with **Worlds** and
+  **Settings** as smaller text buttons stacked directly beneath it (not
+  corner icons). **Worlds** opens `WorldSelectPanel.jsx` (as of 2026-07-12)
+  — a secondary/browse panel, not the default view — showing "Forest" (the
   only real, playable world; picking it does what "Enter the garden" does)
   plus 5 locked teaser tiles (Fishing Village, The Waterfall, The Cave,
   Abandoned Woodlands, The Village — silhouette + hover hint, same visual
