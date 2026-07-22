@@ -11,6 +11,15 @@ import {
   friendlyName,
 } from '../constants.js'
 import Library from './Library.jsx'
+import HistoryPanel from './HistoryPanel.jsx'
+import {
+  isAmbientEnabled,
+  setAmbientEnabled,
+  startAmbient,
+  pauseAmbient,
+  resumeAmbient,
+  stopAmbient,
+} from '../lib/ambientSound.js'
 
 const card =
   'rounded-[18px] border border-[#5a6946]/20 bg-[#faf9f0]/90 shadow-[0_10px_34px_rgba(50,65,38,0.16)] backdrop-blur-md'
@@ -67,6 +76,7 @@ function TierIcon({ tier, className }) {
 
 function IdlePanel({ beginPlacement, plants }) {
   const [picked, setPicked] = useState('sprout')
+  const [intention, setIntention] = useState('')
   const tier = TIERS[picked]
   const grownCounts = TIER_ORDER.reduce((acc, key) => {
     acc[key] = plants.filter((p) => p.tier === key && p.status === 'complete').length
@@ -78,6 +88,13 @@ function IdlePanel({ beginPlacement, plants }) {
       <p className="mb-3 text-[11.5px] font-medium tracking-[0.14em] text-[#7a8a66] uppercase">
         Plant a session
       </p>
+      <input
+        value={intention}
+        onChange={(e) => setIntention(e.target.value)}
+        maxLength={80}
+        placeholder="What are you working on? (optional)"
+        className="mb-3.5 w-full rounded-xl border border-[#5a6946]/25 bg-white/60 px-3.5 py-2.5 text-[13.5px] text-[#38452e] placeholder:text-[#7a8a66]/70 focus:border-[#4a6b3f]/50 focus:bg-white focus:outline-none"
+      />
       <div className="mb-4 flex flex-wrap gap-2.5">
         {TIER_ORDER.map((key) => {
           const sel = picked === key
@@ -113,7 +130,7 @@ function IdlePanel({ beginPlacement, plants }) {
           root. Leave early and it wilts.
         </p>
         <button
-          onClick={() => beginPlacement(picked)}
+          onClick={() => beginPlacement(picked, intention)}
           className="cursor-pointer rounded-xl bg-[#4a6b3f] px-[26px] py-3 text-[15px] font-semibold whitespace-nowrap text-[#f7f5ea] shadow-[0_3px_10px_rgba(58,84,48,0.35)] transition hover:-translate-y-0.5 hover:bg-[#557a49] active:translate-y-0"
         >
           Plant
@@ -163,9 +180,45 @@ function ProgressRing({ progress }) {
   )
 }
 
+// Small speaker toggle for the procedural ambient focus sound. Preference
+// persists across sessions (src/lib/ambientSound.js), so it stays on/off
+// the way you last left it rather than defaulting on every time.
+function AmbientToggle({ on, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={on ? 'Ambient sound on' : 'Ambient sound off'}
+      aria-label={on ? 'Turn off ambient sound' : 'Turn on ambient sound'}
+      className={`ml-1.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition ${
+        on
+          ? 'border-[#4a6b3f]/40 bg-[#e4ecd6] text-[#4a6b3f]'
+          : 'border-[#5a6946]/30 text-[#7a8a66] hover:bg-white/60'
+      }`}
+    >
+      {on ? (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+          <path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4Z" fill="currentColor" />
+          <path
+            d="M16 9c1 .8 1.6 1.9 1.6 3s-.6 2.2-1.6 3M18.3 6.5c1.8 1.4 2.9 3.4 2.9 5.5s-1.1 4.1-2.9 5.5"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+          <path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4Z" fill="currentColor" />
+          <path d="M16.5 9.5l4 4M20.5 9.5l-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 function ActivePanel({ session, plant, cancelSession }) {
   const [now, setNow] = useState(Date.now())
   const [confirming, setConfirming] = useState(false)
+  const [ambientOn, setAmbientOn] = useState(isAmbientEnabled)
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 250)
@@ -187,6 +240,27 @@ function ActivePanel({ session, plant, cancelSession }) {
     }
   }, [remaining])
 
+  // Ambient sound follows the toggle, and fades out entirely once the
+  // session ends (component unmounts). While it's on, switching tabs
+  // pauses/resumes it instead of leaving it running unheard — a gentle,
+  // non-punitive nod to "you stepped away," unlike closing the tab
+  // entirely (which wilts the plant, a separate and stricter rule).
+  useEffect(() => {
+    if (ambientOn) startAmbient()
+    else pauseAmbient()
+    return () => stopAmbient()
+  }, [ambientOn])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!ambientOn) return
+      if (document.hidden) pauseAmbient()
+      else resumeAmbient()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [ambientOn])
+
   return (
     <div className={`pointer-events-auto flex items-center gap-3.5 py-3 pr-5 pl-3.5 ${card}`}>
       <ProgressRing progress={progress} />
@@ -195,9 +269,17 @@ function ActivePanel({ session, plant, cancelSession }) {
           {formatRemaining(remaining)}
         </p>
         <p className="mt-1 text-xs text-[#7a8a66]">
-          {stageName(progress)} · {name}
+          {stageName(progress)} · {session.intention || name}
         </p>
       </div>
+      <AmbientToggle
+        on={ambientOn}
+        onToggle={() => {
+          const next = !ambientOn
+          setAmbientOn(next)
+          setAmbientEnabled(next)
+        }}
+      />
       {confirming ? (
         <div className="ml-1.5 flex items-center gap-2">
           <span className="text-xs text-[#8a5a44]">
@@ -298,8 +380,26 @@ function LibraryButton({ onClick }) {
   )
 }
 
+// Small floating control, bottom-right, that opens the study log.
+function HistoryButton({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Study log"
+      aria-label="Study log"
+      className={`pointer-events-auto grid h-10 w-10 cursor-pointer place-items-center text-[#5c6b4d] transition hover:text-[#38452e] ${card}`}
+    >
+      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden="true">
+        <path d="M12 5c-2-1.3-4.5-1.5-7-1v14c2.5-.5 5-.3 7 1 2-1.3 4.5-1.5 7-1V4c-2.5-.5-5-.3-7 1Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M12 5v14" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    </button>
+  )
+}
+
 export default function TimerOverlay({ grove, onRecenter }) {
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const {
     plants,
     session,
@@ -364,13 +464,15 @@ export default function TimerOverlay({ grove, onRecenter }) {
         )}
       </div>
 
-      {/* recenter view + library controls */}
+      {/* recenter view + library + history controls */}
       <div className="absolute right-5 bottom-6 flex flex-col items-end gap-2">
+        <HistoryButton onClick={() => setHistoryOpen(true)} />
         <LibraryButton onClick={() => setLibraryOpen(true)} />
         <RecenterButton onRecenter={onRecenter} />
       </div>
 
       <Library open={libraryOpen} onClose={() => setLibraryOpen(false)} plants={plants} />
+      <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} plants={plants} />
     </div>
   )
 }

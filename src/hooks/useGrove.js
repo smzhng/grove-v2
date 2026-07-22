@@ -142,13 +142,14 @@ export default function useGrove() {
   const [planting, setPlanting] = useState(null)
 
   const beginPlacement = useCallback(
-    (tierKey) => {
+    (tierKey, intention = '') => {
       if (session || placing || planting) return
       setPlacing({
         tier: tierKey,
         variationIndex: Math.floor(Math.random() * TIERS[tierKey].variations),
         rotation: Math.random() * Math.PI * 2,
         scale: 0.85 + Math.random() * 0.3,
+        intention: intention.trim().slice(0, 80),
       })
     },
     [session, placing, planting],
@@ -168,6 +169,7 @@ export default function useGrove() {
   // Called when the dig/seed animation finishes: the session starts now.
   const finishPlanting = useCallback(() => {
     if (!planting) return
+    const plantedAt = Date.now()
     const plant = {
       id: crypto.randomUUID(),
       tier: planting.tier,
@@ -177,13 +179,16 @@ export default function useGrove() {
       rotation: planting.rotation,
       scale: planting.scale,
       status: 'growing',
+      plantedAt,
+      intention: planting.intention || '',
     }
     setPlants((prev) => [...prev, plant])
     setSession({
       plantId: plant.id,
       tier: planting.tier,
-      startedAt: Date.now(),
+      startedAt: plantedAt,
       durationMs: TIERS[planting.tier].minutes * 60 * 1000,
+      intention: planting.intention || '',
     })
     setPlanting(null)
   }, [planting])
